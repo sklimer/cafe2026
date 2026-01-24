@@ -47,22 +47,9 @@ const Layout: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Простой тестовый компонент */}
-      <div className="p-4">
-        <h1 className="text-2xl font-bold">Тестовая страница</h1>
-        <p>isInTelegram: {isInTelegram ? 'Да' : 'Нет'}</p>
-        <p>Проверка отображения контента</p>
-      </div>
-
       <main className={`pb-16 ${isInTelegram ? 'pt-40' : 'pt-4'}`}>
         <Outlet />
       </main>
-
-      {isInTelegram && (
-        <footer className="fixed bottom-0 w-full bg-white border-t p-2 text-center text-xs text-gray-500">
-          Приложение работает в Telegram WebApp
-        </footer>
-      )}
     </div>
   );
 };

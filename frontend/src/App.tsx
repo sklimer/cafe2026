@@ -26,8 +26,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
-        <Layout>
-          <Routes>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<MenuPage />} />
             <Route path="/menu/:restaurantId" element={<MenuPage />} />
             <Route path="/product/:productId" element={<ProductPage />} />
             <Route path="/addresses" element={<AddressesPage />} />
@@ -37,10 +38,8 @@ function App() {
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/orders" element={<OrdersPage />} />
             <Route path="/order/:orderId" element={<OrderDetailsPage />} />
-            {/* Default route - redirect to first restaurant menu */}
-            <Route path="/" element={<MenuPage />} />
-          </Routes>
-        </Layout>
+          </Route>
+        </Routes>
       </Router>
       <Toaster position="top-center" />
     </QueryClientProvider>
