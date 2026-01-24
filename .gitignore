@@ -14,7 +14,7 @@ target/
 *.ts.map
 
 # Environment
-.env
+backend/.env
 .env.local
 *.env.*
 
