@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -23,7 +23,8 @@ import {
   Tabs,
   Tab,
 } from '@mui/material';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
+import axios from 'axios';
 
 interface Restaurant {
   id: number;
@@ -37,51 +38,83 @@ interface Restaurant {
 }
 
 const Restaurants = () => {
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([
-    {
-      id: 1,
-      name: 'Пиццерия Веселая',
-      city: 'Москва',
-      status: 'active',
-      branchCount: 3,
-      orderCount: 1250,
-      totalRevenue: 2500000,
-      verificationStatus: 'verified'
-    },
-    {
-      id: 2,
-      name: 'Бургерная Быстрая',
-      city: 'Санкт-Петербург',
-      status: 'active',
-      branchCount: 2,
-      orderCount: 850,
-      totalRevenue: 1800000,
-      verificationStatus: 'verified'
-    },
-    {
-      id: 3,
-      name: 'Суши-бар Япония',
-      city: 'Новосибирск',
-      status: 'pending',
-      branchCount: 1,
-      orderCount: 420,
-      totalRevenue: 950000,
-      verificationStatus: 'pending'
-    },
-    {
-      id: 4,
-      name: 'Кафе Уютное',
-      city: 'Екатеринбург',
-      status: 'inactive',
-      branchCount: 1,
-      orderCount: 310,
-      totalRevenue: 620000,
-      verificationStatus: 'verified'
-    },
-  ]);
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [openDialog, setOpenDialog] = useState(false);
   const [currentTab, setCurrentTab] = useState(0);
+
+  useEffect(() => {
+    fetchRestaurants();
+  }, [currentTab]);
+
+  const fetchRestaurants = async () => {
+    try {
+      setLoading(true);
+      // In a real application, this would be an API call
+      // const response = await axios.get(`/api/restaurants?status=${getStatusFilter()}`);
+      // setRestaurants(response.data);
+      
+      // For now, we'll simulate loading real data
+      setTimeout(() => {
+        setRestaurants([
+          {
+            id: 1,
+            name: 'Пиццерия Веселая',
+            city: 'Москва',
+            status: 'active',
+            branchCount: 3,
+            orderCount: 1250,
+            totalRevenue: 2500000,
+            verificationStatus: 'verified'
+          },
+          {
+            id: 2,
+            name: 'Бургерная Быстрая',
+            city: 'Санкт-Петербург',
+            status: 'active',
+            branchCount: 2,
+            orderCount: 850,
+            totalRevenue: 1800000,
+            verificationStatus: 'verified'
+          },
+          {
+            id: 3,
+            name: 'Суши-бар Япония',
+            city: 'Новосибирск',
+            status: 'pending',
+            branchCount: 1,
+            orderCount: 420,
+            totalRevenue: 950000,
+            verificationStatus: 'pending'
+          },
+          {
+            id: 4,
+            name: 'Кафе Уютное',
+            city: 'Екатеринбург',
+            status: 'inactive',
+            branchCount: 1,
+            orderCount: 310,
+            totalRevenue: 620000,
+            verificationStatus: 'verified'
+          },
+        ]);
+        setLoading(false);
+      }, 500);
+    } catch (error) {
+      console.error('Error fetching restaurants:', error);
+      setLoading(false);
+    }
+  };
+
+  const getStatusFilter = () => {
+    switch(currentTab) {
+      case 1: return 'active';
+      case 2: return 'inactive';
+      case 3: return 'pending';
+      default: return 'all';
+    }
+  };
 
   const columns: GridColDef[] = [
     { field: 'id', headerName: 'ID', width: 90 },
@@ -91,7 +124,7 @@ const Restaurants = () => {
       field: 'status',
       headerName: 'Статус',
       width: 120,
-      renderCell: (params) => {
+      renderCell: (params: GridRenderCellParams) => {
         const status = params.value as string;
         let color = 'default';
         if (status === 'active') color = 'success';
@@ -108,7 +141,7 @@ const Restaurants = () => {
       field: 'verificationStatus',
       headerName: 'Верификация',
       width: 150,
-      renderCell: (params) => {
+      renderCell: (params: GridRenderCellParams) => {
         const status = params.value as string;
         let color = 'default';
         if (status === 'verified') color = 'success';
@@ -165,6 +198,7 @@ const Restaurants = () => {
           pageSize={10}
           rowsPerPageOptions={[5, 10, 20]}
           checkboxSelection
+          loading={loading}
         />
       </Paper>
 
