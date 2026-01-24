@@ -1,0 +1,1552 @@
+6.5. API клиенты с Axios
+typescript
+// api/client.ts
+const apiClient = axios.create({
+  baseURL: import.meta.env.VITE_API_URL,
+  timeout: 10000,
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Интерцептор запросов
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = useAuthStore.getState().token;
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    // Добавление Telegram initData если доступен
+    if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initData) {
+      config.headers['X-Telegram-Init-Data'] = window.Telegram.WebApp.initData;
+    }
+
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Интерцептор ответов
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Обработка 401 ошибки (истекший токен)
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        // Попытка обновить токен
+        const { data } = await apiClient.post('/auth/refresh');
+
+        // Сохранение нового токена
+        useAuthStore.getState().login(
+          useAuthStore.getState().user!,
+          data.tokens.access_token
+        );
+
+        // Повтор оригинального запроса
+        originalRequest.headers.Authorization = `Bearer ${data.tokens.access_token}`;
+        return apiClient(originalRequest);
+      } catch (refreshError) {
+        // Если обновление не удалось, разлогиниваем
+        useAuthStore.getState().logout();
+        window.location.href = '/';
+        return Promise.reject(refreshError);
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+// API методы
+export const authApi = {
+  loginWithTelegram: (initData: string) =>
+    apiClient.post<AuthResponse>('/auth/telegram/', { initData }),
+
+  getMe: () => apiClient.get<UserResponse>('/auth/me/'),
+
+  logout: () => apiClient.post('/auth/logout/'),
+
+  refreshToken: () => apiClient.post<TokenRefreshResponse>('/auth/refresh/'),
+};
+
+export const restaurantApi = {
+  getRestaurants: (params?: RestaurantParams) =>
+    apiClient.get<PaginatedResponse<Restaurant>>('/restaurants/', { params }),
+
+  getRestaurant: (id: string) =>
+    apiClient.get<Restaurant>(`/restaurants/${id}/`),
+
+  getBranches: (restaurantId: string) =>
+    apiClient.get<RestaurantBranch[]>(`/restaurants/${restaurantId}/branches/`),
+
+  getBranchAvailability: (branchId: string, params: AvailabilityParams) =>
+    apiClient.get<BranchAvailability>(`/branches/${branchId}/availability/`, { params }),
+};
+
+export const productApi = {
+  getCategories: (restaurantId: string) =>
+    apiClient.get<Category[]>(`/restaurants/${restaurantId}/categories/`),
+
+  getProducts: (params?: ProductParams) =>
+    apiClient.get<PaginatedResponse<Product>>('/products/', { params }),
+
+  getProduct: (id: string) =>
+    apiClient.get<Product>(`/products/${id}/`),
+
+  searchProducts: (params: SearchParams) =>
+    apiClient.get<PaginatedResponse<Product>>('/products/search/', { params }),
+};
+
+export const cartApi = {
+  getCart: () => apiClient.get<CartResponse>('/cart/'),
+
+  addToCart: (data: AddCartItem) =>
+    apiClient.post<CartResponse>('/cart/add/', data),
+
+  updateCartItem: (data: UpdateCartItem) =>
+    apiClient.put<CartResponse>('/cart/update/', data),
+
+  removeCartItem: (itemId: string) =>
+    apiClient.delete<CartResponse>(`/cart/remove/?item_id=${itemId}`),
+
+  clearCart: () => apiClient.post<CartResponse>('/cart/clear/'),
+};
+
+export const orderApi = {
+  createOrder: (data: CreateOrderData) =>
+    apiClient.post<Order>('/orders/', data),
+
+  getOrders: (params?: OrderParams) =>
+    apiClient.get<PaginatedResponse<Order>>('/orders/', { params }),
+
+  getOrder: (id: string) =>
+    apiClient.get<Order>(`/orders/${id}/`),
+
+  cancelOrder: (id: string) =>
+    apiClient.post(`/orders/${id}/cancel/`),
+
+  trackOrder: (id: string) =>
+    apiClient.get<OrderTracking>(`/orders/${id}/track/`),
+};
+
+export const addressApi = {
+  getAddresses: () => apiClient.get<UserAddress[]>('/addresses/'),
+
+  createAddress: (data: CreateAddressData) =>
+    apiClient.post<UserAddress>('/addresses/', data),
+
+  updateAddress: (id: string, data: UpdateAddressData) =>
+    apiClient.put<UserAddress>(`/addresses/${id}/`, data),
+
+  deleteAddress: (id: string) =>
+    apiClient.delete(`/addresses/${id}/`),
+
+  geocodeAddress: (address: string) =>
+    apiClient.post<GeocodeResponse>('/addresses/geocode/', { address }),
+
+  getSuggestions: (query: string) =>
+    apiClient.get<AddressSuggestion[]>('/addresses/suggestions/', {
+      params: { query }
+    }),
+};
+
+export const bonusApi = {
+  getBalance: () => apiClient.get<BonusBalance>('/bonus/balance/'),
+
+  getTransactions: (params?: BonusTransactionParams) =>
+    apiClient.get<PaginatedResponse<BonusTransaction>>('/bonus/transactions/', { params }),
+
+  getRules: () => apiClient.get<BonusRule[]>('/bonus/rules/'),
+
+  validatePromoCode: (data: ValidatePromoCodeData) =>
+    apiClient.post<PromoCodeValidation>('/promo/validate/', data),
+
+  getActivePromoCodes: () =>
+    apiClient.get<PromoCode[]>('/promo/active/'),
+};
+
+export const paymentApi = {
+  createPayment: (data: CreatePaymentData) =>
+    apiClient.post<PaymentResponse>('/payments/create/', data),
+
+  getPaymentStatus: (params: PaymentStatusParams) =>
+    apiClient.get<PaymentStatus>('/payments/status/', { params }),
+};
+6.6. TypeScript типы
+typescript
+// types/api.types.ts
+export interface ApiResponse<T = any> {
+  data: T;
+  message?: string;
+  success: boolean;
+}
+
+export interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
+export interface ErrorResponse {
+  detail?: string;
+  errors?: Record<string, string[]>;
+  message?: string;
+  code?: string;
+}
+
+// types/user.types.ts
+export interface User {
+  id: number;
+  telegram_id: number;
+  username: string | null;
+  first_name: string;
+  last_name: string | null;
+  phone: string | null;
+  email: string | null;
+  language_code: string;
+  is_premium: boolean;
+
+  total_orders: number;
+  total_spent: number;
+  bonus_balance: number;
+  bonus_percent_allowed: number;
+
+  referral_code: string;
+  referred_by: number | null;
+  referral_count: number;
+
+  notification_preferences: NotificationPreferences;
+  settings: UserSettings;
+
+  registration_date: string;
+  last_login: string;
+  last_activity: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationPreferences {
+  order_updates: boolean;
+  promotions: boolean;
+  newsletter: boolean;
+  push: boolean;
+  email: boolean;
+  sms: boolean;
+}
+
+export interface UserSettings {
+  default_order_type: 'delivery' | 'pickup';
+  save_order_history: boolean;
+  save_addresses: boolean;
+  theme: 'light' | 'dark';
+  currency: string;
+}
+
+// types/product.types.ts
+export interface Product {
+  id: number;
+  restaurant_id: number;
+  category_id: number | null;
+
+  name: string;
+  description: string;
+  short_description: string;
+
+  price: number;
+  old_price: number | null;
+  cost_price: number | null;
+  profit_margin: number | null;
+
+  is_available: boolean;
+  stock_quantity: number | null;
+  low_stock_threshold: number;
+  is_unlimited_stock: boolean;
+
+  weight_grams: number | null;
+  volume_ml: number | null;
+  calories: number | null;
+  proteins: number | null;
+  fats: number | null;
+  carbohydrates: number | null;
+
+  main_image_url: string | null;
+  image_urls: string[];
+  video_url: string | null;
+
+  is_popular: boolean;
+  is_new: boolean;
+  is_recommended: boolean;
+  is_spicy: boolean;
+  is_vegetarian: boolean;
+  is_vegan: boolean;
+  is_gluten_free: boolean;
+
+  cooking_time_minutes: number | null;
+  preparation_instructions: string | null;
+
+  display_order: number;
+  seo_title: string | null;
+  seo_description: string | null;
+  seo_keywords: string[];
+
+  custom_attributes: Record<string, any>;
+
+  created_at: string;
+  updated_at: string;
+
+  // Relations
+  category?: Category;
+  restaurant?: Restaurant;
+  tags?: Tag[];
+  options?: ProductOption[];
+}
+
+export interface ProductOption {
+  id: number;
+  restaurant_id: number;
+  name: string;
+  description: string | null;
+
+  option_type: 'single_choice' | 'multiple_choice' | 'quantity' | 'boolean';
+  is_required: boolean;
+  min_selection: number;
+  max_selection: number;
+  default_value: string | null;
+
+  display_order: number;
+  help_text: string | null;
+
+  is_active: boolean;
+  created_at: string;
+
+  values?: OptionValue[];
+}
+
+export interface OptionValue {
+  id: number;
+  option_id: number;
+  value: string;
+  description: string | null;
+
+  price_modifier: number;
+  cost_modifier: number;
+
+  is_available: boolean;
+  stock_quantity: number | null;
+
+  display_order: number;
+  is_default: boolean;
+  color: string | null;
+  icon_url: string | null;
+
+  created_at: string;
+}
+
+// types/order.types.ts
+export interface Order {
+  id: number;
+  order_number: string;
+
+  user_id: number;
+  user_telegram_id: number;
+  user_name: string;
+  user_phone: string;
+  user_email: string | null;
+
+  restaurant_branch_id: number;
+  restaurant_name: string;
+  branch_name: string;
+
+  order_type: 'delivery' | 'pickup';
+  status: OrderStatus;
+
+  delivery_address_id: number | null;
+  delivery_address: string | null;
+  delivery_latitude: number | null;
+  delivery_longitude: number | null;
+  delivery_distance_meters: number | null;
+  delivery_zone_id: number | null;
+
+  preferred_delivery_time: string | null;
+  delivery_time_slot: string | null;
+  actual_delivery_time: string | null;
+
+  pickup_time: string | null;
+  actual_pickup_time: string | null;
+
+  subtotal: number;
+  delivery_fee: number;
+  service_fee: number;
+  packaging_fee: number;
+  discount_amount: number;
+  bonus_used: number;
+  total_amount: number;
+  tips_amount: number;
+
+  promo_code_id: number | null;
+  promo_code: string | null;
+  promo_discount_amount: number;
+  bonus_percent_used: number;
+  bonus_earned: number;
+
+  payment_method: string;
+  payment_status: PaymentStatus;
+  payment_provider: string | null;
+  payment_id: string | null;
+  payment_url: string | null;
+
+  courier_id: number | null;
+  courier_name: string | null;
+  courier_phone: string | null;
+  courier_vehicle: string | null;
+  courier_tracking_url: string | null;
+
+  estimated_preparation_time: string | null;
+  estimated_delivery_time: string | null;
+  preparation_duration_minutes: number | null;
+  delivery_duration_minutes: number | null;
+
+  customer_comment: string | null;
+  special_instructions: string | null;
+  restaurant_notes: string | null;
+  cancellation_reason: string | null;
+
+  source: string;
+  device_info: Record<string, any> | null;
+  ip_address: string | null;
+  user_agent: string | null;
+
+  created_at: string;
+  updated_at: string;
+  confirmed_at: string | null;
+  prepared_at: string | null;
+  dispatched_at: string | null;
+  completed_at: string | null;
+  cancelled_at: string | null;
+
+  // Relations
+  user?: User;
+  restaurant_branch?: RestaurantBranch;
+  delivery_address_obj?: UserAddress;
+  items?: OrderItem[];
+  status_history?: OrderStatusHistory[];
+}
+
+export type OrderStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'preparing'
+  | 'ready'
+  | 'delivering'
+  | 'delivered'
+  | 'picked_up'
+  | 'cancelled'
+  | 'refunded'
+  | 'failed';
+
+export type PaymentStatus =
+  | 'pending'
+  | 'processing'
+  | 'paid'
+  | 'failed'
+  | 'refunded'
+  | 'cancelled';
+
+export interface OrderItem {
+  id: number;
+  order_id: number;
+  product_id: number | null;
+
+  product_name: string;
+  product_description: string | null;
+  product_price: number;
+
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+
+  selected_options: SelectedOption[];
+  options_modifier: number;
+
+  special_instructions: string | null;
+
+  is_prepared: boolean;
+  prepared_at: string | null;
+
+  created_at: string;
+
+  // Relations
+  product?: Product;
+}
+
+export interface SelectedOption {
+  option_id: number;
+  option_name: string;
+  values: SelectedOptionValue[];
+}
+
+export interface SelectedOptionValue {
+  value_id: number;
+  value: string;
+  price_modifier: number;
+}
+7. БЕЗОПАСНОСТЬ
+7.1. Telegram аутентификация
+python
+# security/telegram_auth.py
+import hashlib
+import hmac
+import json
+from urllib.parse import parse_qsl
+
+class TelegramAuthValidator:
+    """
+    Валидатор Telegram Web App initData
+    """
+
+    def __init__(self, bot_token: str):
+        self.bot_token = bot_token
+
+    def validate_init_data(self, init_data: str) -> bool:
+        """
+        Проверка подписи Telegram initData
+        """
+        try:
+            # Парсинг query string
+            parsed_data = dict(parse_qsl(init_data))
+
+            # Извлечение hash и данных для проверки
+            received_hash = parsed_data.pop('hash', '')
+            data_check_string = '\n'.join(
+                f"{key}={value}"
+                for key, value in sorted(parsed_data.items())
+            )
+
+            # Вычисление секретного ключа
+            secret_key = hmac.new(
+                key=b"WebAppData",
+                msg=self.bot_token.encode(),
+                digestmod=hashlib.sha256
+            ).digest()
+
+            # Проверка подписи
+            computed_hash = hmac.new(
+                key=secret_key,
+                msg=data_check_string.encode(),
+                digestmod=hashlib.sha256
+            ).hexdigest()
+
+            return hmac.compare_digest(computed_hash, received_hash)
+
+        except Exception as e:
+            logger.error(f"Telegram auth validation error: {e}")
+            return False
+
+    def extract_user_data(self, init_data: str) -> dict:
+        """
+        Извлечение данных пользователя из initData
+        """
+        try:
+            parsed_data = dict(parse_qsl(init_data))
+            user_data_str = parsed_data.get('user', '')
+
+            if user_data_str:
+                user_data = json.loads(user_data_str)
+                return {
+                    'id': user_data.get('id'),
+                    'username': user_data.get('username'),
+                    'first_name': user_data.get('first_name'),
+                    'last_name': user_data.get('last_name'),
+                    'language_code': user_data.get('language_code'),
+                    'is_premium': user_data.get('is_premium', False),
+                    'photo_url': user_data.get('photo_url'),
+                }
+
+            return {}
+
+        except Exception as e:
+            logger.error(f"Error extracting user data: {e}")
+            return {}
+
+    def validate_auth_date(self, init_data: str, max_age_seconds: int = 86400) -> bool:
+        """
+        Проверка времени создания initData
+        """
+        try:
+            parsed_data = dict(parse_qsl(init_data))
+            auth_date = int(parsed_data.get('auth_date', 0))
+
+            import time
+            current_time = int(time.time())
+
+            return (current_time - auth_date) <= max_age_seconds
+
+        except Exception as e:
+            logger.error(f"Error validating auth date: {e}")
+            return False
+7.2. JWT аутентификация
+python
+# security/jwt_auth.py
+from datetime import datetime, timedelta
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+class JWTAuth:
+    """
+    JWT аутентификация
+    """
+
+    def __init__(self, secret_key: str, algorithm: str = "HS256"):
+        self.secret_key = secret_key
+        self.algorithm = algorithm
+
+    def create_access_token(self, data: dict, expires_delta: timedelta = None) -> str:
+        """
+        Создание access token
+        """
+        to_encode = data.copy()
+
+        if expires_delta:
+            expire = datetime.utcnow() + expires_delta
+        else:
+            expire = datetime.utcnow() + timedelta(minutes=15)
+
+        to_encode.update({"exp": expire, "type": "access"})
+        encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
+
+        return encoded_jwt
+
+    def create_refresh_token(self, data: dict, expires_delta: timedelta = None) -> str:
+        """
+        Создание refresh token
+        """
+        to_encode = data.copy()
+
+        if expires_delta:
+            expire = datetime.utcnow() + expires_delta
+        else:
+            expire = datetime.utcnow() + timedelta(days=7)
+
+        to_encode.update({"exp": expire, "type": "refresh"})
+        encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
+
+        return encoded_jwt
+
+    def verify_token(self, token: str, token_type: str = "access") -> dict:
+        """
+        Верификация токена
+        """
+        try:
+            payload = jwt.decode(
+                token,
+                self.secret_key,
+                algorithms=[self.algorithm],
+                options={"verify_exp": True}
+            )
+
+            if payload.get("type") != token_type:
+                raise JWTError("Invalid token type")
+
+            return payload
+
+        except JWTError as e:
+            raise e
+
+    def hash_password(self, password: str) -> str:
+        """
+        Хэширование пароля
+        """
+        return pwd_context.hash(password)
+
+    def verify_password(self, plain_password: str, hashed_password: str) -> bool:
+        """
+        Проверка пароля
+        """
+        return pwd_context.verify(plain_password, hashed_password)
+7.3. Защита от атак
+python
+# security/middleware.py
+from django.utils.deprecation import MiddlewareMixin
+from django.conf import settings
+import time
+
+class SecurityMiddleware(MiddlewareMixin):
+    """
+    Middleware для безопасности
+    """
+
+    def process_request(self, request):
+        # Установка security headers
+        pass
+
+    def process_response(self, request, response):
+        # Добавление security headers
+        response['X-Content-Type-Options'] = 'nosniff'
+        response['X-Frame-Options'] = 'DENY'
+        response['X-XSS-Protection'] = '1; mode=block'
+        response['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+
+        if settings.DEBUG:
+            response['Access-Control-Allow-Origin'] = '*'
+        else:
+            response['Access-Control-Allow-Origin'] = settings.ALLOWED_HOSTS[0]
+
+        return response
+
+class RateLimitMiddleware(MiddlewareMixin):
+    """
+    Ограничение количества запросов
+    """
+
+    def __init__(self, get_response):
+        super().__init__(get_response)
+        self.requests = {}
+
+    def process_request(self, request):
+        ip = self.get_client_ip(request)
+        current_time = time.time()
+
+        # Очистка старых записей
+        self.clean_old_requests(current_time)
+
+        # Проверка лимита
+        if self.is_rate_limited(ip, current_time):
+            from django.http import HttpResponseForbidden
+            return HttpResponseForbidden("Rate limit exceeded")
+
+        return None
+
+    def get_client_ip(self, request):
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+
+    def clean_old_requests(self, current_time):
+        cutoff = current_time - 60  # 1 минута
+        self.requests = {
+            ip: [t for t in times if t > cutoff]
+            for ip, times in self.requests.items()
+            if any(t > cutoff for t in times)
+        }
+
+    def is_rate_limited(self, ip, current_time):
+        if ip not in self.requests:
+            self.requests[ip] = []
+
+        # Лимит: 100 запросов в минуту
+        if len(self.requests[ip]) >= 100:
+            return True
+
+        self.requests[ip].append(current_time)
+        return False
+
+# security/validators.py
+from django.core.exceptions import ValidationError
+import re
+
+class InputValidator:
+    """
+    Валидатор входных данных
+    """
+
+    @staticmethod
+    def validate_phone(phone: str) -> bool:
+        """
+        Валидация номера телефона
+        """
+        pattern = r'^\+?[1-9]\d{1,14}$'
+        return bool(re.match(pattern, phone))
+
+    @staticmethod
+    def validate_email(email: str) -> bool:
+        """
+        Валидация email
+        """
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        return bool(re.match(pattern, email))
+
+    @staticmethod
+    def sanitize_input(input_str: str) -> str:
+        """
+        Санация входных данных
+        """
+        # Удаление опасных символов
+        sanitized = re.sub(r'[<>"\'&]', '', input_str)
+        # Удаление лишних пробелов
+        sanitized = ' '.join(sanitized.split())
+        return sanitized
+
+    @staticmethod
+    def validate_json_structure(data: dict, required_fields: list) -> bool:
+        """
+        Валидация структуры JSON
+        """
+        for field in required_fields:
+            if field not in data:
+                return False
+        return True
+
+    @staticmethod
+    def prevent_sql_injection(query: str) -> str:
+        """
+        Защита от SQL инъекций
+        """
+        dangerous_keywords = [
+            'DROP', 'DELETE', 'INSERT', 'UPDATE', 'SELECT',
+            'UNION', 'OR', 'AND', '--', ';'
+        ]
+
+        query_upper = query.upper()
+        for keyword in dangerous_keywords:
+            if keyword in query_upper:
+                raise ValidationError(f"Potentially dangerous SQL keyword detected: {keyword}")
+
+        return query
+8. РАЗВЕРТЫВАНИЕ И ИНФРАСТРУКТУРА
+8.1. Docker конфигурация
+dockerfile
+# Dockerfile для бэкенда
+FROM python:3.11-slim
+
+# Установка зависимостей системы
+RUN apt-get update && apt-get install -y \
+    gcc \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Создание пользователя приложения
+RUN useradd -m -u 1000 appuser
+WORKDIR /app
+COPY --chown=appuser:appuser . .
+
+# Установка Python зависимостей
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Переключение на пользователя приложения
+USER appuser
+
+# Запуск приложения
+CMD ["gunicorn", "app.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4"]
+dockerfile
+# Dockerfile для фронтенда
+FROM node:18-alpine as build
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/nginx.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+      DEBUG: ${DEBUG}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      JWT_SECRET: ${JWT_SECRET}
+    volumes:
+      - ./backend:/app
+      - static_volume:/app/static
+      - media_volume:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             gunicorn app.wsgi:application --bind 0.0.0.0:8000 --workers 4"
+
+  # Celery worker
+  celery_worker:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A app worker --loglevel=info
+
+  # Celery beat
+  celery_beat:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A app beat --loglevel=info
+
+  # Frontend
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:8000/api/v1
+      VITE_TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+      - static_volume:/static
+      - media_volume:/media
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  postgres_data:
+  redis_data:
+  static_volume:
+  media_volume:
+8.2. Nginx конфигурация
+nginx
+# nginx/nginx.conf
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    # Логирование
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log /var/log/nginx/access.log main;
+    error_log /var/log/nginx/error.log warn;
+
+    # Основные настройки
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+    client_max_body_size 100M;
+
+    # Gzip сжатие
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types text/plain text/css text/xml text/javascript
+               application/json application/javascript application/xml+rss
+               application/atom+xml image/svg+xml;
+
+    # Security headers
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self';" always;
+
+    # Backend upstream
+    upstream backend {
+        server backend:8000;
+    }
+
+    # Frontend upstream
+    upstream frontend {
+        server frontend:80;
+    }
+
+    # HTTPS сервер
+    server {
+        listen 443 ssl http2;
+        server_name yourdomain.com;
+
+        # SSL сертификаты
+        ssl_certificate /etc/nginx/ssl/fullchain.pem;
+        ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+
+        # SSL настройки
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384;
+        ssl_prefer_server_ciphers off;
+        ssl_session_cache shared:SSL:10m;
+        ssl_session_timeout 10m;
+
+        # Статические файлы Django
+        location /static/ {
+            alias /static/;
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+
+        location /media/ {
+            alias /media/;
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+
+        # API запросы
+        location /api/ {
+            proxy_pass http://backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # WebSocket support
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+
+            # Timeouts
+            proxy_connect_timeout 60s;
+            proxy_send_timeout 60s;
+            proxy_read_timeout 60s;
+        }
+
+        # Admin панель
+        location /admin/ {
+            proxy_pass http://backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Frontend приложение
+        location / {
+            proxy_pass http://frontend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # Для SPA маршрутизации
+            try_files $uri $uri/ /index.html;
+        }
+
+        # Health checks
+        location /health/ {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+    }
+
+    # HTTP редирект на HTTPS
+    server {
+        listen 80;
+        server_name yourdomain.com;
+        return 301 https://$server_name$request_uri;
+    }
+}
+8.3. CI/CD конфигурация (GitHub Actions)
+yaml
+# .github/workflows/deploy.yml
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        cd backend
+        pip install -r requirements.txt
+
+    - name: Run migrations
+      run: |
+        cd backend
+        python manage.py migrate
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        SECRET_KEY: test-secret-key
+
+    - name: Run tests
+      run: |
+        cd backend
+        python manage.py test
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        SECRET_KEY: test-secret-key
+
+    - name: Lint with flake8
+      run: |
+        cd backend
+        pip install flake8
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+    - name: Type check with mypy
+      run: |
+        cd backend
+        pip install mypy
+        mypy . --ignore-missing-imports
+
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and push backend
+      uses: docker/build-push-action@v4
+      with:
+        context: ./backend
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/restaurant-backend:latest
+          ${{ secrets.DOCKER_USERNAME }}/restaurant-backend:${{ github.sha }}
+
+    - name: Build and push frontend
+      uses: docker/build-push-action@v4
+      with:
+        context: ./frontend
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/restaurant-frontend:latest
+          ${{ secrets.DOCKER_USERNAME }}/restaurant-frontend:${{ github.sha }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Copy files to server
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USERNAME }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        source: "docker-compose.yml,nginx/"
+        target: "/opt/restaurant-app"
+
+    - name: Deploy on server
+      uses: appleboy/ssh-action@v0.1.6
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USERNAME }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        script: |
+          cd /opt/restaurant-app
+
+          # Pull new images
+          docker-compose pull
+
+          # Restart services
+          docker-compose up -d --force-recreate
+
+          # Clean up old images
+          docker image prune -f
+
+          # Run migrations
+          docker-compose exec backend python manage.py migrate
+
+          # Collect static files
+          docker-compose exec backend python manage.py collectstatic --noinput
+8.4. Мониторинг и логирование
+yaml
+# docker-compose.monitoring.yml
+version: '3.8'
+
+services:
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3001:3000"
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+  # ELK Stack для логов
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.6.0
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    restart: unless-stopped
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.6.0
+    volumes:
+      - ./logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    ports:
+      - "5000:5000"
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.6.0
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+  # Filebeat для сбора логов
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.6.0
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml
+    depends_on:
+      - logstash
+    restart: unless-stopped
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  elasticsearch_data:
+9. ДОКУМЕНТАЦИЯ И ПОДДЕРЖКА
+9.1. Документация API (Swagger/OpenAPI)
+python
+# api/docs.py
+from drf_yasg import openapi
+from drf_yasg.views import get_schema_view
+from rest_framework import permissions
+
+schema_view = get_schema_view(
+    openapi.Info(
+        title="Restaurant Telegram Mini App API",
+        default_version='v1',
+        description="""
+        API для Telegram Mini App ресторанов с доставкой и самовывозом.
+
+        ## Аутентификация
+        Система использует два типа аутентификации:
+        1. **Telegram WebApp** - для клиентов через initData
+        2. **JWT токены** - для авторизованных запросов
+
+        ### Получение доступа:
+        1. Отправьте POST запрос на `/api/v1/auth/telegram/` с `initData` из Telegram
+        2. В ответе получите JWT токены (access и refresh)
+        3. Используйте access token в заголовке `Authorization: Bearer <token>`
+
+        ## Основные возможности:
+        - Просмотр ресторанов и филиалов
+        - Работа с каталогом товаров (категории, опции, теги)
+        - Управление корзиной
+        - Оформление заказов (доставка/самовывоз)
+        - Бонусная система и промокоды
+        - Управление адресами доставки
+        - История заказов и отслеживание статусов
+
+        ## Коды ответов:
+        - 200: Успешный запрос
+        - 201: Успешно создано
+        - 400: Ошибка валидации
+        - 401: Не авторизован
+        - 403: Доступ запрещен
+        - 404: Не найдено
+        - 429: Слишком много запросов
+        - 500: Внутренняя ошибка сервера
+        """,
+        terms_of_service="https://yourdomain.com/terms/",
+        contact=openapi.Contact(email="support@yourdomain.com"),
+        license=openapi.License(name="BSD License"),
+    ),
+    public=True,
+    permission_classes=[permissions.AllowAny],
+)
+
+# urls.py
+from django.urls import path
+from .docs import schema_view
+
+urlpatterns = [
+    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+    path('swagger.json/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
+]
+9.2. Инструкция по развертыванию
+markdown
+# Руководство по развертыванию
+
+## Требования
+- Docker 20.10+
+- Docker Compose 2.0+
+- Ubuntu 20.04+ / Debian 11+
+- 4GB RAM минимум, 8GB рекомендуется
+- 20GB свободного места на диске
+
+## Установка
+
+### 1. Настройка сервера
+```bash
+# Обновление системы
+sudo apt update && sudo apt upgrade -y
+
+# Установка Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+
+# Установка Docker Compose
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+
+# Добавление пользователя в группу docker
+sudo usermod -aG docker $USER
+newgrp docker
+2. Клонирование проекта
+bash
+cd /opt
+git clone https://github.com/yourusername/restaurant-telegram-app.git
+cd restaurant-telegram-app
+3. Настройка переменных окружения
+bash
+cp .env.example .env
+# Отредактируйте .env файл
+nano .env
+4. Получение SSL сертификатов
+bash
+# Установка certbot
+sudo apt install certbot -y
+
+# Получение сертификата
+sudo certbot certonly --standalone -d yourdomain.com
+
+# Копирование сертификатов в папку nginx
+sudo cp /etc/letsencrypt/live/yourdomain.com/fullchain.pem nginx/ssl/
+sudo cp /etc/letsencrypt/live/yourdomain.com/privkey.pem nginx/ssl/
+5. Запуск приложения
+bash
+# Запуск всех сервисов
+docker-compose up -d
+
+# Проверка статуса
+docker-compose ps
+
+# Просмотр логов
+docker-compose logs -f
+6. Настройка Telegram бота
+1.	Создайте бота через @BotFather
+2.	Получите токен бота
+3.	Добавьте токен в .env файл
+4.	Настройте вебхук:
+bash
+curl -F "url=https://yourdomain.com/bot/webhook/" \
+     -F "secret_token=YOUR_SECRET_TOKEN" \
+     https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook
+7. Создание суперпользователя Django
+bash
+docker-compose exec backend python manage.py createsuperuser
+Мониторинг
+Приложение доступно по адресам:
+•	Приложение: https://yourdomain.com
+•	API: https://yourdomain.com/api/v1/
+•	Админ-панель: https://yourdomain.com/admin/
+•	Документация API: https://yourdomain.com/swagger/
+•	Мониторинг (Grafana): https://yourdomain.com:3001/
+•	Логи (Kibana): https://yourdomain.com:5601/
+Обновление
+bash
+# Остановка сервисов
+docker-compose down
+
+# Получение обновлений
+git pull origin main
+
+# Перестройка образов
+docker-compose build
+
+# Запуск с обновлениями
+docker-compose up -d
+
+# Применение миграций
+docker-compose exec backend python manage.py migrate
+Бэкапы
+bash
+# Автоматические бэкапы (добавить в crontab)
+0 2 * * * docker-compose exec postgres pg_dump -U postgres restaurant_db > /backups/restaurant_$(date +%Y%m%d).sql
+Устранение неполадок
+Проблемы с подключением к БД
+bash
+# Проверка подключения
+docker-compose exec postgres pg_isready
+
+# Вход в БД
+docker-compose exec postgres psql -U postgres restaurant_db
+Проблемы с миграциями
+bash
+# Сброс миграций (только для разработки!)
+docker-compose exec backend python manage.py migrate --fake
+
+# Создание новых миграций
+docker-compose exec backend python manage.py makemigrations
+docker-compose exec backend python manage.py migrate
+Очистка системы
+bash
+# Остановка и удаление контейнеров
+docker-compose down -v
+
+# Очистка неиспользуемых образов
+docker image prune -a
+
+# Очистка томов
+docker volume prune
+Техническая поддержка
+При возникновении проблем:
+1.	Проверьте логи: docker-compose logs [service_name]
+2.	Проверьте доступность сервисов: docker-compose ps
+3.	Проверьте сетевые настройки
+4.	Обратитесь в техническую поддержку: support@yourdomain.com
+text
+
+Это полное ТЗ покрывает все аспекты разработки системы от архитектуры БД до развертывания и мониторинга. Проект готов к реализации опытной командой разработчиков.

@@ -1,0 +1,47 @@
+
+5. API СПЕЦИФИКАЦИЯ (Django REST Framework)
+5.1. Основные endpoints
+5.1.1. Аутентификация
+python
+# api/v1/auth/
+router.register('auth', AuthViewSet, basename='auth')
+
+class AuthViewSet(viewsets.ViewSet):
+    """
+    Аутентификация через Telegram и JWT
+    """
+
+    @action(detail=False, methods=['POST'])
+    def telegram(self, request):
+        """
+        Аутентификация через Telegram initData
+        POST /api/v1/auth/telegram/
+        {
+            "initData": "query_id=...&user=..."
+        }
+        """
+        pass
+
+    @action(detail=False, methods=['POST'])
+    def refresh(self, request):
+        """
+        Обновление JWT токена
+        POST /api/v1/auth/refresh/
+        """
+        pass
+
+    @action(detail=False, methods=['POST'])
+    def logout(self, request):
+        """
+        Выход из системы
+        POST /api/v1/auth/logout/
+        """
+        pass
+
+    @action(detail=False, methods=['GET'])
+    def me(self, request):
+        """
+        Получение информации о текущем пользователе
+        GET /api/v1/auth/me/
+        """
+        pass
