@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useTelegram } from '../../hooks/useTelegram';
 
@@ -19,12 +20,8 @@ const TelegramStatus: React.FC = () => {
     console.log('[Telegram Mini App] TelegramStatus component mounted');
   }, []);
 
-  if (!isTelegramWebApp) {
-    return null; // Don't render anything when not in Telegram
-  }
-
   return (
-    <div className="fixed top-0 left-0 right-0 bg-blue-100 border-b border-blue-300 p-2 text-xs z-50 overflow-y-auto max-h-40">
+    <div className={`${isTelegramWebApp ? 'fixed top-0 left-0 right-0 bg-blue-100 border-b border-blue-300 p-2 text-xs z-50 overflow-y-auto max-h-40' : 'hidden'}`}>
       <div className="font-bold mb-1">Telegram Mini App Status:</div>
       <div><span className="font-semibold">Environment:</span> Running in Telegram WebApp</div>
       <div><span className="font-semibold">Version:</span> {version || 'N/A'}</div>

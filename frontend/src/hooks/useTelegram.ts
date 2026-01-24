@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 
 declare global {
@@ -195,6 +196,8 @@ export interface TelegramWebAppContext {
   disableClosingConfirmation: () => void;
 }
 
+let telegramInitialized = false;
+
 export const useTelegram = (): TelegramWebAppContext => {
   const [webApp, setWebApp] = useState<TelegramWebApp | null>(null);
   const [themeParams, setThemeParams] = useState<ThemeParams>({});
@@ -202,6 +205,12 @@ export const useTelegram = (): TelegramWebAppContext => {
 
   useEffect(() => {
     console.log('[Telegram Mini App] Initialization started');
+
+    // Prevent multiple initializations
+    if (telegramInitialized) {
+      console.log('[Telegram Mini App] Already initialized, skipping');
+      return;
+    }
 
     // Log whether Telegram WebApp object is available
     const telegramAvailable = !!(window.Telegram?.WebApp);
@@ -249,11 +258,18 @@ export const useTelegram = (): TelegramWebAppContext => {
     console.log('[Telegram Mini App] Setting background color to #f8f9fa');
     tg.setBackgroundColor('#f8f9fa');
 
+    telegramInitialized = true;
+
     console.log('[Telegram Mini App] Storing WebApp instance');
     setWebApp(tg);
     setThemeParams(tg.themeParams);
     setIsReady(true);
     console.log('[Telegram Mini App] Initialization completed successfully');
+
+    // Cleanup function to reset the flag when component unmounts
+    return () => {
+      telegramInitialized = false;
+    };
   }, []);
 
   const isTelegramWebApp = !!webApp;

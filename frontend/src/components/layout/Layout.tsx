@@ -21,7 +21,7 @@ const Layout: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <TelegramStatus />
       {/* Header будет добавлен через дочерние компоненты */}
-      <main className="pb-16 pt-40"> {/* Добавляем отступ сверху для статуса и снизу для нижней навигации */}
+      <main className={`pb-16 ${isTelegramWebApp ? 'pt-40' : 'pt-4'}`}> {/* Добавляем отступ сверху для статуса и снизу для нижней навигации */}
         <Outlet />
       </main>
       {!isTelegramWebApp && (
