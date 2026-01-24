@@ -1,50 +1,48 @@
 ```
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
+# Dependencies
+node_modules/
+
+# Build outputs
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+build/
+*.tsbuildinfo
 
-# Virtual environments
-venv/
-env/
-ENV/
-.venv/
-.env/
-
-# Django
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-media/
-staticfiles/
+# Environment variables
 .env
+.env.local
+.env.*
 
-# IDE
+# IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
+
+# Logs
+*.log
+
+# Temporary files
 *.tmp
 
-# OS
+# Coverage reports
+coverage/
+htmlcov/
+*.coverage
+
+# Python related (if any Python files exist in the project)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg-info/
+.eggs/
+
+# OS generated files
 .DS_Store
 Thumbs.db
+
+# Vite specific
+vite.config.ts.bak
 ```
