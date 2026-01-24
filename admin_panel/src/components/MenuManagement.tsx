@@ -27,15 +27,17 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  TreeView,
-  TreeItem,
+  List,
+  ListItem,
+  ListItemText,
+  Collapse,
   Switch,
   FormGroup,
   FormControlLabel,
 } from '@mui/material';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -170,13 +172,31 @@ const MenuManagement = () => {
     setOpenCategoryDialog(false);
   };
 
+  const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
+
+  const toggleCategory = (id: number) => {
+    if (expandedCategories.includes(id)) {
+      setExpandedCategories(expandedCategories.filter(catId => catId !== id));
+    } else {
+      setExpandedCategories([...expandedCategories, id]);
+    }
+  };
+
   const renderTree = (nodes: Category[], parentId: number | null = null) => {
     const children = nodes.filter(node => node.parentId === parentId);
-    
+
     return children.map(node => (
-      <TreeItem key={node.id} nodeId={node.id.toString()} label={`${node.name} (${node.childCount})`}>
-        {renderTree(nodes, node.id)}
-      </TreeItem>
+      <div key={node.id}>
+        <ListItem button onClick={() => toggleCategory(node.id)}>
+          <ListItemText primary={`${node.name} (${node.childCount})`} />
+          {expandedCategories.includes(node.id) ? <ExpandLess /> : <ExpandMore />}
+        </ListItem>
+        <Collapse in={expandedCategories.includes(node.id)}>
+          <List component="div" disablePadding>
+            {renderTree(nodes, node.id)}
+          </List>
+        </Collapse>
+      </div>
     ));
   };
 
@@ -216,13 +236,9 @@ const MenuManagement = () => {
           <Typography variant="h6" gutterBottom>
             Категории
           </Typography>
-          <TreeView
-            aria-label="categories"
-            defaultCollapseIcon={<ExpandMoreIcon />}
-            defaultExpandIcon={<ChevronRightIcon />}
-          >
+          <List>
             {renderTree(categories)}
-          </TreeView>
+          </List>
         </Paper>
 
         <Paper sx={{ width: '70%', height: 600 }}>
