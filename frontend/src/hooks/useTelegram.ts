@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 
 declare global {
@@ -196,160 +195,94 @@ export interface TelegramWebAppContext {
   disableClosingConfirmation: () => void;
 }
 
-let telegramInitialized = false;
+// Глобальные переменные для хранения состояния
+let globalWebApp: TelegramWebApp | null = null;
+let globalIsReady = false;
+let globalThemeParams: ThemeParams = {};
+let globalInitializationPromise: Promise<void> | null = null;
 
 export const useTelegram = (): TelegramWebAppContext => {
-  const [webApp, setWebApp] = useState<TelegramWebApp | null>(null);
-  const [themeParams, setThemeParams] = useState<ThemeParams>({});
-  const [isReady, setIsReady] = useState(false);
+  const [state, setState] = useState({
+    webApp: null as TelegramWebApp | null,
+    isReady: false,
+    themeParams: {} as ThemeParams,
+    isTelegramWebApp: false
+  });
 
   useEffect(() => {
-    console.log('[Telegram Mini App] Initialization started');
+    console.log('[Telegram Mini App] Hook initialization started');
 
-    // Prevent multiple initializations
-    if (telegramInitialized) {
-      console.log('[Telegram Mini App] Already initialized, skipping');
-      return;
-    }
+    const tg = window.Telegram?.WebApp;
 
-    // Log whether Telegram WebApp object is available
-    const telegramAvailable = !!(window.Telegram?.WebApp);
-    console.log('[Telegram Mini App] Telegram WebApp available:', telegramAvailable);
-
-    if (!telegramAvailable) {
+    if (!tg) {
       console.log('[Telegram Mini App] Running outside of Telegram WebApp environment');
       return;
     }
 
-    const tg = window.Telegram.WebApp;
-    console.log('[Telegram Mini App] Telegram WebApp object:', tg);
+    console.log('[Telegram Mini App] Telegram WebApp available:', true);
     console.log('[Telegram Mini App] Version:', tg.version);
     console.log('[Telegram Mini App] Platform:', tg.platform);
-    console.log('[Telegram Mini App] Color scheme:', tg.colorScheme);
-    console.log('[Telegram Mini App] Is expanded:', tg.isExpanded);
-    console.log('[Telegram Mini App] Viewport height:', tg.viewportHeight);
-    console.log('[Telegram Mini App] Viewport stable height:', tg.viewportStableHeight);
-    console.log('[Telegram Mini App] Header color:', tg.headerColor);
-    console.log('[Telegram Mini App] Background color:', tg.backgroundColor);
-    console.log('[Telegram Mini App] Theme params:', tg.themeParams);
-    console.log('[Telegram Mini App] Init data (safe):', tg.initData ? 'Available' : 'Not available');
-    console.log('[Telegram Mini App] Init data unsafe:', tg.initDataUnsafe);
 
-    if (tg.initDataUnsafe?.user) {
-      console.log('[Telegram Mini App] User info:', {
-        id: tg.initDataUnsafe.user.id,
-        firstName: tg.initDataUnsafe.user.first_name,
-        lastName: tg.initDataUnsafe.user.last_name,
-        username: tg.initDataUnsafe.user.username,
-        languageCode: tg.initDataUnsafe.user.language_code,
-        isPremium: tg.initDataUnsafe.user.is_premium
-      });
-    }
-
-    // Initialize the app
-    console.log('[Telegram Mini App] Calling tg.ready()');
+    // Инициализация
     tg.ready();
-    console.log('[Telegram Mini App] Calling tg.expand()');
     tg.expand();
-
-    // Set colors based on theme
-    console.log('[Telegram Mini App] Setting header color to #4e73df');
     tg.setHeaderColor('#4e73df');
-    console.log('[Telegram Mini App] Setting background color to #f8f9fa');
     tg.setBackgroundColor('#f8f9fa');
 
-    telegramInitialized = true;
+    setState({
+      webApp: tg,
+      isReady: true,
+      themeParams: tg.themeParams || {},
+      isTelegramWebApp: true
+    });
 
-    console.log('[Telegram Mini App] Storing WebApp instance');
-    setWebApp(tg);
-    setThemeParams(tg.themeParams);
-    setIsReady(true);
-    console.log('[Telegram Mini App] Initialization completed successfully');
-
-    // Cleanup function to reset the flag when component unmounts
-    return () => {
-      telegramInitialized = false;
-    };
+    console.log('[Telegram Mini App] Hook initialization completed');
   }, []);
 
-  const isTelegramWebApp = !!webApp;
-  console.log('[Telegram Mini App] Current Telegram status:', isTelegramWebApp);
-
   return {
-    user: webApp?.initDataUnsafe?.user,
-    webApp: webApp || undefined,
-    themeParams,
-    isTelegramWebApp,
-    initData: webApp?.initData,
-    initDataUnsafe: webApp?.initDataUnsafe,
-    version: webApp?.version,
-    platform: webApp?.platform,
-    colorScheme: webApp?.colorScheme,
-    isExpanded: webApp?.isExpanded,
-    viewportHeight: webApp?.viewportHeight,
-    viewportStableHeight: webApp?.viewportStableHeight,
-    headerColor: webApp?.headerColor,
-    backgroundColor: webApp?.backgroundColor,
-    isReady,
-    ready: () => {
-      console.log('[Telegram Mini App] ready() method called');
-      return webApp?.ready();
-    },
-    expand: () => {
-      console.log('[Telegram Mini App] expand() method called');
-      return webApp?.expand();
-    },
-    close: () => {
-      console.log('[Telegram Mini App] close() method called');
-      return webApp?.close();
-    },
-    sendData: (data: any) => {
-      console.log('[Telegram Mini App] sendData() method called with data:', data);
-      return webApp?.sendData(JSON.stringify(data));
-    },
-    showNotification: (message: string) => {
-      console.log('[Telegram Mini App] showNotification() method called with message:', message);
-      return webApp?.showNotification(message);
-    },
-    showAlert: (message: string) => {
-      console.log('[Telegram Mini App] showAlert() method called with message:', message);
-      return webApp?.showAlert(message);
-    },
-    showConfirm: (message: string, callback: (confirmed: boolean) => void) => {
-      console.log('[Telegram Mini App] showConfirm() method called with message:', message);
-      return webApp?.showConfirm(message, callback);
-    },
-    showPopup: (params: PopupParams, callback?: (buttonId: string) => void) => {
-      console.log('[Telegram Mini App] showPopup() method called with params:', params);
-      return webApp?.showPopup(params, callback);
-    },
-    openLink: (url: string, options?: OpenLinkOptions) => {
-      console.log('[Telegram Mini App] openLink() method called with url:', url, 'and options:', options);
-      return webApp?.openLink(url, options);
-    },
-    openTelegramLink: (url: string) => {
-      console.log('[Telegram Mini App] openTelegramLink() method called with url:', url);
-      return webApp?.openTelegramLink(url);
-    },
-    openInvoice: (url: string, callback: (status: string) => void) => {
-      console.log('[Telegram Mini App] openInvoice() method called with url:', url);
-      return webApp?.openInvoice(url, callback);
-    },
-    setHeaderColor: (color: string) => {
-      console.log('[Telegram Mini App] setHeaderColor() method called with color:', color);
-      return webApp?.setHeaderColor(color);
-    },
-    setBackgroundColor: (color: string) => {
-      console.log('[Telegram Mini App] setBackgroundColor() method called with color:', color);
-      return webApp?.setBackgroundColor(color);
-    },
-    enableClosingConfirmation: () => {
-      console.log('[Telegram Mini App] enableClosingConfirmation() method called');
-      return webApp?.enableClosingConfirmation();
-    },
-    disableClosingConfirmation: () => {
-      console.log('[Telegram Mini App] disableClosingConfirmation() method called');
-      return webApp?.disableClosingConfirmation();
-    },
+    user: state.webApp?.initDataUnsafe?.user,
+    webApp: state.webApp || undefined,
+    themeParams: state.themeParams,
+    isTelegramWebApp: state.isTelegramWebApp,
+    initData: state.webApp?.initData,
+    initDataUnsafe: state.webApp?.initDataUnsafe,
+    version: state.webApp?.version,
+    platform: state.webApp?.platform,
+    colorScheme: state.webApp?.colorScheme,
+    isExpanded: state.webApp?.isExpanded,
+    viewportHeight: state.webApp?.viewportHeight,
+    viewportStableHeight: state.webApp?.viewportStableHeight,
+    headerColor: state.webApp?.headerColor,
+    backgroundColor: state.webApp?.backgroundColor,
+    isReady: state.isReady,
+    ready: () => state.webApp?.ready(),
+    expand: () => state.webApp?.expand(),
+    close: () => state.webApp?.close(),
+    sendData: (data: any) => state.webApp?.sendData(JSON.stringify(data)),
+    showNotification: (message: string) => state.webApp?.showNotification(message),
+    showAlert: (message: string) => state.webApp?.showAlert(message),
+    showConfirm: (message: string, callback: (confirmed: boolean) => void) =>
+      state.webApp?.showConfirm(message, callback),
+    showPopup: (params: PopupParams, callback?: (buttonId: string) => void) =>
+      state.webApp?.showPopup(params, callback),
+    openLink: (url: string, options?: OpenLinkOptions) =>
+      state.webApp?.openLink(url, options),
+    openTelegramLink: (url: string) => state.webApp?.openTelegramLink(url),
+    openInvoice: (url: string, callback: (status: string) => void) =>
+      state.webApp?.openInvoice(url, callback),
+    setHeaderColor: (color: string) => state.webApp?.setHeaderColor(color),
+    setBackgroundColor: (color: string) => state.webApp?.setBackgroundColor(color),
+    enableClosingConfirmation: () => state.webApp?.enableClosingConfirmation(),
+    disableClosingConfirmation: () => state.webApp?.disableClosingConfirmation(),
   };
+};
+
+// Вспомогательная функция для прямого доступа к WebApp (если нужно вне хуков)
+export const getTelegramWebApp = (): TelegramWebApp | null => {
+  return globalWebApp;
+};
+
+// Вспомогательная функция для проверки, инициализирован ли WebApp
+export const isTelegramInitialized = (): boolean => {
+  return globalIsReady && !!globalWebApp;
 };
