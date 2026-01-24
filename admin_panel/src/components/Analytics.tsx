@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -27,6 +27,7 @@ import {
   Legend,
   ArcElement,
 } from 'chart.js';
+import { analyticsAPI } from '../services/api';
 
 ChartJS.register(
   CategoryScale,
@@ -40,75 +41,84 @@ ChartJS.register(
   ArcElement
 );
 
+// Define interfaces for our data
+interface Stat {
+  title: string;
+  value: string;
+  change: string;
+}
+
+interface TopRestaurant {
+  name: string;
+  revenue: number;
+  orders: number;
+}
+
+interface ChartData {
+  labels: string[];
+  datasets: Array<{
+    label: string;
+    data: number[];
+    backgroundColor?: string | string[];
+    borderColor?: string | string[];
+    borderWidth?: number;
+    fill?: boolean;
+    tension?: number;
+  }>;
+}
+
 const Analytics = () => {
   const [timeRange, setTimeRange] = useState('week');
   const [currentTab, setCurrentTab] = useState(0);
+  const [revenueData, setRevenueData] = useState<ChartData>({ labels: [], datasets: [] });
+  const [ordersData, setOrdersData] = useState<ChartData>({ labels: [], datasets: [] });
+  const [topProductsData, setTopProductsData] = useState<ChartData>({ labels: [], datasets: [] });
+  const [stats, setStats] = useState<Stat[]>([]);
+  const [topRestaurants, setTopRestaurants] = useState<TopRestaurant[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data for charts
-  const revenueData = {
-    labels: timeRange === 'week' ? ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] : ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн'],
-    datasets: [
-      {
-        label: 'Выручка',
-        data: timeRange === 'week' ? [12000, 19000, 15000, 18000, 22000, 28000, 25000] : [120000, 150000, 180000, 140000, 190000, 210000],
-        backgroundColor: 'rgba(54, 162, 235, 0.5)',
-        borderColor: 'rgba(54, 162, 235, 1)',
-        borderWidth: 1,
-      },
-    ],
-  };
+  // Fetch analytics data
+  useEffect(() => {
+    const fetchAnalyticsData = async () => {
+      try {
+        // Using API service to fetch real data
+        const [statsRes, revenueRes, ordersRes, productsRes, restaurantsRes] = await Promise.allSettled([
+          analyticsAPI.getStats({ period: timeRange }),
+          analyticsAPI.getRevenueData({ period: timeRange }),
+          analyticsAPI.getOrdersData({ period: timeRange }),
+          analyticsAPI.getTopProducts({ period: timeRange }),
+          analyticsAPI.getTopRestaurants({ period: timeRange })
+        ]);
 
-  const ordersData = {
-    labels: timeRange === 'week' ? ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] : ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн'],
-    datasets: [
-      {
-        label: 'Заказы',
-        data: timeRange === 'week' ? [15, 23, 18, 22, 27, 35, 31] : [150, 180, 210, 170, 190, 220],
-        fill: false,
-        backgroundColor: 'rgba(75, 192, 192, 0.5)',
-        borderColor: 'rgba(75, 192, 192, 1)',
-        tension: 0.1,
-      },
-    ],
-  };
+        if (statsRes.status === 'fulfilled') {
+          setStats(statsRes.value.data);
+        }
 
-  const topProductsData = {
-    labels: ['Пицца Маргарита', 'Бургер', 'Кофе', 'Паста', 'Салат'],
-    datasets: [
-      {
-        data: [35, 25, 20, 12, 8],
-        backgroundColor: [
-          'rgba(255, 99, 132, 0.5)',
-          'rgba(54, 162, 235, 0.5)',
-          'rgba(255, 205, 86, 0.5)',
-          'rgba(75, 192, 192, 0.5)',
-          'rgba(153, 102, 255, 0.5)',
-        ],
-        borderColor: [
-          'rgba(255, 99, 132, 1)',
-          'rgba(54, 162, 235, 1)',
-          'rgba(255, 205, 86, 1)',
-          'rgba(75, 192, 192, 1)',
-          'rgba(153, 102, 255, 1)',
-        ],
-        borderWidth: 1,
-      },
-    ],
-  };
+        if (revenueRes.status === 'fulfilled') {
+          setRevenueData(revenueRes.value.data);
+        }
 
-  const stats = [
-    { title: 'Общая выручка', value: '1,250,000₽', change: '+12%' },
-    { title: 'Всего заказов', value: '3,240', change: '+8%' },
-    { title: 'Средний чек', value: '386₽', change: '+4%' },
-    { title: 'Новые клиенты', value: '420', change: '+15%' },
-  ];
+        if (ordersRes.status === 'fulfilled') {
+          setOrdersData(ordersRes.value.data);
+        }
 
-  const topRestaurants = [
-    { name: 'Пиццерия Веселая', revenue: 450000, orders: 850 },
-    { name: 'Бургерная Быстрая', revenue: 320000, orders: 620 },
-    { name: 'Суши-бар Япония', revenue: 280000, orders: 540 },
-    { name: 'Кафе Уютное', revenue: 200000, orders: 410 },
-  ];
+        if (productsRes.status === 'fulfilled') {
+          setTopProductsData(productsRes.value.data);
+        }
+
+        if (restaurantsRes.status === 'fulfilled') {
+          setTopRestaurants(restaurantsRes.value.data);
+        }
+
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching analytics data:', error);
+        setLoading(false);
+      }
+    };
+
+    fetchAnalyticsData();
+  }, [timeRange]);
 
   return (
     <Box sx={{ flexGrow: 1 }}>

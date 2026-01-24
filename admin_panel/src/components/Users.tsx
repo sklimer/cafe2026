@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -32,6 +32,7 @@ import EmailIcon from '@mui/icons-material/Email';
 import PhoneIcon from '@mui/icons-material/Phone';
 import EditIcon from '@mui/icons-material/Edit';
 import SendIcon from '@mui/icons-material/Send';
+import { usersAPI } from '../services/api';
 
 interface User {
   id: number;
@@ -50,83 +51,24 @@ interface User {
 }
 
 const Users = () => {
-  const [users, setUsers] = useState<User[]>([
-    {
-      id: 1,
-      telegramId: '123456789',
-      username: 'ivanov',
-      firstName: 'Иван',
-      lastName: 'Иванов',
-      phone: '+7 (999) 123-45-67',
-      email: 'ivanov@example.com',
-      registrationDate: '2023-05-15',
-      orderCount: 12,
-      totalSpent: 25000,
-      bonusBalance: 150,
-      isActive: true,
-      isBlocked: false
-    },
-    {
-      id: 2,
-      telegramId: '987654321',
-      username: 'smirnova',
-      firstName: 'Анна',
-      lastName: 'Смирнова',
-      phone: '+7 (999) 987-65-43',
-      email: 'smirnova@example.com',
-      registrationDate: '2023-06-20',
-      orderCount: 8,
-      totalSpent: 18000,
-      bonusBalance: 80,
-      isActive: true,
-      isBlocked: false
-    },
-    {
-      id: 3,
-      telegramId: '555666777',
-      username: 'petrov',
-      firstName: 'Петр',
-      lastName: 'Петров',
-      phone: '+7 (999) 555-66-77',
-      email: 'petrov@example.com',
-      registrationDate: '2023-07-10',
-      orderCount: 5,
-      totalSpent: 9500,
-      bonusBalance: 50,
-      isActive: true,
-      isBlocked: false
-    },
-    {
-      id: 4,
-      telegramId: '111222333',
-      username: 'kozlova',
-      firstName: 'Мария',
-      lastName: 'Козлова',
-      phone: '+7 (999) 111-22-33',
-      email: 'kozlova@example.com',
-      registrationDate: '2023-08-05',
-      orderCount: 15,
-      totalSpent: 32000,
-      bonusBalance: 200,
-      isActive: false,
-      isBlocked: false
-    },
-    {
-      id: 5,
-      telegramId: '444555666',
-      username: 'volkov',
-      firstName: 'Алексей',
-      lastName: 'Волков',
-      phone: '+7 (999) 444-55-66',
-      email: 'volkov@example.com',
-      registrationDate: '2023-09-12',
-      orderCount: 3,
-      totalSpent: 6500,
-      bonusBalance: 30,
-      isActive: true,
-      isBlocked: true
-    },
-  ]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        // Using API service to fetch real data
+        const response = await usersAPI.getAll();
+        setUsers(response.data);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
 
   const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
@@ -174,9 +116,9 @@ const Users = () => {
       headerName: 'Активен',
       width: 100,
       renderCell: (params) => (
-        <Chip 
-          label={params.value ? 'Да' : 'Нет'} 
-          color={params.value ? 'success' : 'default'} 
+        <Chip
+          label={params.value ? 'Да' : 'Нет'}
+          color={params.value ? 'success' : 'default'}
         />
       )
     },
@@ -185,9 +127,9 @@ const Users = () => {
       headerName: 'Заблокирован',
       width: 120,
       renderCell: (params) => (
-        <Chip 
-          label={params.value ? 'Да' : 'Нет'} 
-          color={params.value ? 'error' : 'default'} 
+        <Chip
+          label={params.value ? 'Да' : 'Нет'}
+          color={params.value ? 'error' : 'default'}
         />
       )
     },

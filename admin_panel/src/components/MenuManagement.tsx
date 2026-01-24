@@ -37,11 +37,11 @@ import {
 } from '@mui/material';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
-import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
+import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import axios from 'axios';
+import { menuAPI } from '../services/api';
 
 interface Category {
   id: number;
@@ -68,56 +68,44 @@ const MenuManagement = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Using API service to fetch real data
+        const [categoriesRes, productsRes] = await Promise.allSettled([
+          menuAPI.getCategories(),
+          menuAPI.getProducts()
+        ]);
+
+        if (categoriesRes.status === 'fulfilled') {
+          setCategories(categoriesRes.value.data);
+        }
+
+        if (productsRes.status === 'fulfilled') {
+          setProducts(productsRes.value.data);
+        }
+
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching menu data:', error);
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
   const [selectedProducts, setSelectedProducts] = useState<number[]>([]);
   const [openProductDialog, setOpenProductDialog] = useState(false);
   const [openCategoryDialog, setOpenCategoryDialog] = useState(false);
   const [currentTab, setCurrentTab] = useState(0);
-
-  useEffect(() => {
-    fetchMenuData();
-  }, []);
-
-  const fetchMenuData = async () => {
-    try {
-      setLoading(true);
-      // In a real application, these would be API calls
-      // const categoriesResponse = await axios.get('/api/categories');
-      // const productsResponse = await axios.get('/api/products');
-      // setCategories(categoriesResponse.data);
-      // setProducts(productsResponse.data);
-
-      // For now, we'll simulate loading real data
-      setTimeout(() => {
-        setCategories([
-          { id: 1, name: 'Пицца', parentId: null, level: 0, childCount: 5 },
-          { id: 2, name: 'Бургеры', parentId: null, level: 0, childCount: 3 },
-          { id: 3, name: 'Напитки', parentId: null, level: 0, childCount: 8 },
-          { id: 4, name: 'Десерты', parentId: null, level: 0, childCount: 4 },
-          { id: 5, name: 'Мясные', parentId: 1, level: 1, childCount: 0 },
-          { id: 6, name: 'Вегетарианские', parentId: 1, level: 1, childCount: 0 },
-        ]);
-
-        setProducts([
-          { id: 1, name: 'Пицца Маргарита', category: 'Пицца', price: 550, costPrice: 300, isAvailable: true, stockQuantity: 15, orderCount: 45, tags: ['хит', 'новинка'] },
-          { id: 2, name: 'Пицца Пепперони', category: 'Пицца', price: 650, costPrice: 350, isAvailable: true, stockQuantity: 10, orderCount: 32, tags: ['хит'] },
-          { id: 3, name: 'Бургер Чизбургер', category: 'Бургеры', price: 450, costPrice: 250, isAvailable: true, stockQuantity: 20, orderCount: 38, tags: ['популярное'] },
-          { id: 4, name: 'Кофе Латте', category: 'Напитки', price: 250, costPrice: 80, isAvailable: true, stockQuantity: 50, orderCount: 52, tags: ['популярное'] },
-          { id: 5, name: 'Чизкейк', category: 'Десерты', price: 350, costPrice: 150, isAvailable: false, stockQuantity: 0, orderCount: 12, tags: [] },
-        ]);
-        setLoading(false);
-      }, 500);
-    } catch (error) {
-      console.error('Error fetching menu data:', error);
-      setLoading(false);
-    }
-  };
 
   const productColumns: GridColDef[] = [
     {
       field: 'checkbox',
       headerName: '',
       width: 50,
-      renderCell: (params: GridRenderCellParams) => (
+      renderCell: (params) => (
         <Checkbox
           checked={selectedProducts.includes(params.row.id)}
           onChange={(e) => {
@@ -138,7 +126,7 @@ const MenuManagement = () => {
       field: 'isAvailable',
       headerName: 'Доступен',
       width: 100,
-      renderCell: (params: GridRenderCellParams) => (
+      renderCell: (params) => (
         <Switch checked={params.value} />
       )
     },
@@ -148,7 +136,7 @@ const MenuManagement = () => {
       field: 'tags',
       headerName: 'Теги',
       width: 150,
-      renderCell: (params: GridRenderCellParams) => (
+      renderCell: (params) => (
         <Box>
           {params.value.map((tag: string, index: number) => (
             <Chip key={index} label={tag} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
@@ -160,7 +148,7 @@ const MenuManagement = () => {
       field: 'actions',
       headerName: 'Действия',
       width: 120,
-      renderCell: (params: GridRenderCellParams) => (
+      renderCell: (params) => (
         <>
           <IconButton size="small" onClick={() => console.log('Edit', params.row.id)}>
             <EditIcon />
@@ -274,7 +262,6 @@ const MenuManagement = () => {
             columns={productColumns}
             pageSize={10}
             rowsPerPageOptions={[5, 10, 20]}
-            loading={loading}
           />
         </Paper>
       </Box>

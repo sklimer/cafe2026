@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -28,6 +28,7 @@ import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import { promotionsAPI } from '../services/api';
 
 interface Promotion {
   id: number;
@@ -44,44 +45,24 @@ interface Promotion {
 }
 
 const Promotions = () => {
-  const [promotions, setPromotions] = useState<Promotion[]>([
-    {
-      id: 1,
-      name: 'Скидка 20% на первый заказ',
-      type: 'discount',
-      discountType: 'percent',
-      discountValue: 20,
-      startDate: '2024-01-01',
-      endDate: '2024-12-31',
-      minAmount: 500,
-      maxUses: 1000,
-      usedCount: 450,
-      isActive: true
-    },
-    {
-      id: 2,
-      name: 'Бесплатная доставка',
-      type: 'free_delivery',
-      discountType: 'fixed',
-      discountValue: 0,
-      startDate: '2024-01-01',
-      endDate: '2024-01-31',
-      minAmount: 1000,
-      usedCount: 120,
-      isActive: true
-    },
-    {
-      id: 3,
-      name: 'Комбо-предложение',
-      type: 'combo',
-      discountType: 'fixed',
-      discountValue: 150,
-      startDate: '2024-01-15',
-      endDate: '2024-02-15',
-      usedCount: 30,
-      isActive: false
-    },
-  ]);
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPromotions = async () => {
+      try {
+        // Using API service to fetch real data
+        const response = await promotionsAPI.getAll();
+        setPromotions(response.data);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching promotions:', error);
+        setLoading(false);
+      }
+    };
+
+    fetchPromotions();
+  }, []);
 
   const [selectedPromotions, setSelectedPromotions] = useState<number[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
@@ -143,9 +124,9 @@ const Promotions = () => {
       headerName: 'Активен',
       width: 100,
       renderCell: (params) => (
-        <Chip 
-          label={params.value ? 'Да' : 'Нет'} 
-          color={params.value ? 'success' : 'default'} 
+        <Chip
+          label={params.value ? 'Да' : 'Нет'}
+          color={params.value ? 'success' : 'default'}
         />
       )
     },
@@ -236,7 +217,7 @@ const Promotions = () => {
                 ))}
               </Select>
             </FormControl>
-            
+
             <FormControl component="fieldset" sx={{ mb: 2 }}>
               <FormLabel component="legend">Тип скидки</FormLabel>
               <RadioGroup defaultValue="percent" sx={{ flexDirection: 'row' }}>
@@ -244,7 +225,7 @@ const Promotions = () => {
                 <FormControlLabel value="fixed" control={<Radio />} label="Фиксированная" />
               </RadioGroup>
             </FormControl>
-            
+
             <TextField
               margin="dense"
               label="Значение скидки"
@@ -253,7 +234,7 @@ const Promotions = () => {
               type="number"
               sx={{ mb: 2 }}
             />
-            
+
             <TextField
               margin="dense"
               label="Дата начала"
@@ -263,7 +244,7 @@ const Promotions = () => {
               InputLabelProps={{ shrink: true }}
               sx={{ mb: 2 }}
             />
-            
+
             <TextField
               margin="dense"
               label="Дата окончания"
@@ -273,7 +254,7 @@ const Promotions = () => {
               InputLabelProps={{ shrink: true }}
               sx={{ mb: 2 }}
             />
-            
+
             <TextField
               margin="dense"
               label="Минимальная сумма заказа"
@@ -282,7 +263,7 @@ const Promotions = () => {
               type="number"
               sx={{ mb: 2 }}
             />
-            
+
             <TextField
               margin="dense"
               label="Максимальное количество использований"
@@ -291,7 +272,7 @@ const Promotions = () => {
               type="number"
               sx={{ mb: 2 }}
             />
-            
+
             <FormControlLabel
               control={<Switch />}
               label="Активен"

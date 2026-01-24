@@ -25,10 +25,10 @@ import {
   IconButton,
   Checkbox,
 } from '@mui/material';
-import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
+import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import PrintIcon from '@mui/icons-material/Print';
 import EditIcon from '@mui/icons-material/Edit';
-import axios from 'axios';
+import { ordersAPI } from '../services/api';
 
 interface Order {
   id: number;
@@ -45,98 +45,32 @@ const Orders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        // Using API service to fetch real data
+        const response = await ordersAPI.getAll();
+        setOrders(response.data);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, []);
+
   const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [currentTab, setCurrentTab] = useState(0);
 
-  useEffect(() => {
-    fetchOrders();
-  }, [currentTab]);
-
-  const fetchOrders = async () => {
-    try {
-      setLoading(true);
-      // In a real application, this would be an API call
-      // const response = await axios.get(`/api/orders?status=${getStatusFilter()}`);
-      // setOrders(response.data);
-
-      // For now, we'll simulate loading real data
-      setTimeout(() => {
-        setOrders([
-          {
-            id: 1,
-            orderNumber: 'ORD-2024-001234',
-            customer: 'Иван Иванов',
-            amount: 1250,
-            status: 'confirmed',
-            date: '2024-01-12 18:30',
-            type: 'delivery',
-            restaurant: 'Пиццерия Веселая'
-          },
-          {
-            id: 2,
-            orderNumber: 'ORD-2024-001233',
-            customer: 'Анна Смирнова',
-            amount: 850,
-            status: 'preparing',
-            date: '2024-01-12 17:45',
-            type: 'pickup',
-            restaurant: 'Бургерная Быстрая'
-          },
-          {
-            id: 3,
-            orderNumber: 'ORD-2024-001232',
-            customer: 'Петр Петров',
-            amount: 2100,
-            status: 'on_way',
-            date: '2024-01-12 16:20',
-            type: 'delivery',
-            restaurant: 'Суши-бар Япония'
-          },
-          {
-            id: 4,
-            orderNumber: 'ORD-2024-001231',
-            customer: 'Мария Козлова',
-            amount: 950,
-            status: 'delivered',
-            date: '2024-01-11 20:15',
-            type: 'delivery',
-            restaurant: 'Пиццерия Веселая'
-          },
-          {
-            id: 5,
-            orderNumber: 'ORD-2024-001230',
-            customer: 'Алексей Волков',
-            amount: 650,
-            status: 'cancelled',
-            date: '2024-01-11 15:30',
-            type: 'pickup',
-            restaurant: 'Кафе Уютное'
-          },
-        ]);
-        setLoading(false);
-      }, 500);
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-      setLoading(false);
-    }
-  };
-
-  const getStatusFilter = () => {
-    switch(currentTab) {
-      case 1: return 'new';
-      case 2: return 'preparing';
-      case 3: return 'on_way';
-      case 4: return 'delivered';
-      default: return 'all';
-    }
-  };
   const columns: GridColDef[] = [
     {
       field: 'checkbox',
       headerName: '',
       width: 50,
-      renderCell: (params: GridRenderCellParams) => (
+      renderCell: (params) => (
         <Checkbox
           checked={selectedOrders.includes(params.row.id)}
           onChange={(e) => {
@@ -156,7 +90,7 @@ const Orders = () => {
       field: 'status',
       headerName: 'Статус',
       width: 120,
-      renderCell: (params: GridRenderCellParams) => {
+      renderCell: (params) => {
         const status = params.value as string;
         let color = 'default';
         switch (status) {
@@ -188,7 +122,7 @@ const Orders = () => {
       field: 'type',
       headerName: 'Тип',
       width: 100,
-      renderCell: (params: GridRenderCellParams) => (
+      renderCell: (params) => (
         <Chip
           label={params.value === 'delivery' ? 'Доставка' : 'Самовывоз'}
           color={params.value === 'delivery' ? 'primary' : 'default'}
@@ -200,7 +134,7 @@ const Orders = () => {
       field: 'actions',
       headerName: 'Действия',
       width: 120,
-      renderCell: (params: GridRenderCellParams) => (
+      renderCell: (params) => (
         <>
           <IconButton size="small" onClick={() => console.log('Edit', params.row.id)}>
             <EditIcon />
@@ -273,7 +207,6 @@ const Orders = () => {
           columns={columns}
           pageSize={10}
           rowsPerPageOptions={[5, 10, 20]}
-          loading={loading}
         />
       </Paper>
 
