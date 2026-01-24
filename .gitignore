@@ -5,14 +5,20 @@ node_modules/
 # Build outputs
 dist/
 build/
-*.tsbuildinfo
+target/
 
-# Environment variables
+# TypeScript/JavaScript
+*.tsbuildinfo
+*.js.map
+*.jsx.map
+*.ts.map
+
+# Environment
 .env
 .env.local
-.env.*
+*.env.*
 
-# IDE files
+# Editors
 .vscode/
 .idea/
 *.swp
@@ -23,26 +29,4 @@ build/
 
 # Temporary files
 *.tmp
-
-# Coverage reports
-coverage/
-htmlcov/
-*.coverage
-
-# Python related (if any Python files exist in the project)
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-*.egg-info/
-.eggs/
-
-# OS generated files
-.DS_Store
-Thumbs.db
-
-# Vite specific
-vite.config.ts.bak
 ```
