@@ -26,77 +26,165 @@ ChartJS.register(
   ArcElement
 );
 
+import { useEffect, useState } from 'react';
+import axios from 'axios';
+
+interface DashboardStat {
+  title: string;
+  value: string;
+  icon: string;
+}
+
+interface Order {
+  id: string;
+  customer: string;
+  amount: string;
+  type: string;
+}
+
+interface Product {
+  name: string;
+  sales: number;
+}
+
 const Dashboard = () => {
-  // Mock data for charts
-  const revenueData = {
-    labels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
-    datasets: [
-      {
-        label: 'Выручка',
-        data: [12000, 19000, 15000, 18000, 22000, 28000, 25000],
-        backgroundColor: 'rgba(54, 162, 235, 0.5)',
-        borderColor: 'rgba(54, 162, 235, 1)',
-        borderWidth: 1,
-      },
-    ],
+  const [stats, setStats] = useState<DashboardStat[]>([
+    { title: 'Заказов сегодня', value: '--', icon: '📦' },
+    { title: 'Выручка сегодня', value: '--', icon: '💰' },
+    { title: 'Новые клиенты', value: '--', icon: '👥' },
+    { title: 'Наполнение', value: '--', icon: '📊' },
+  ]);
+  
+  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+  const [popularProducts, setPopularProducts] = useState<Product[]>([]);
+  
+  const [revenueData, setRevenueData] = useState<any>({
+    labels: [],
+    datasets: [{
+      label: 'Выручка',
+      data: [],
+      backgroundColor: 'rgba(54, 162, 235, 0.5)',
+      borderColor: 'rgba(54, 162, 235, 1)',
+      borderWidth: 1,
+    }]
+  });
+  
+  const [ordersData, setOrdersData] = useState<any>({
+    labels: [],
+    datasets: [{
+      label: 'Заказы',
+      data: [],
+      fill: false,
+      backgroundColor: 'rgba(75, 192, 192, 0.5)',
+      borderColor: 'rgba(75, 192, 192, 1)',
+      tension: 0.1,
+    }]
+  });
+  
+  const [popularProductsData, setPopularProductsData] = useState<any>({
+    labels: [],
+    datasets: [{
+      data: [],
+      backgroundColor: [
+        'rgba(255, 99, 132, 0.5)',
+        'rgba(54, 162, 235, 0.5)',
+        'rgba(255, 205, 86, 0.5)',
+        'rgba(75, 192, 192, 0.5)',
+        'rgba(153, 102, 255, 0.5)',
+      ],
+      borderColor: [
+        'rgba(255, 99, 132, 1)',
+        'rgba(54, 162, 235, 1)',
+        'rgba(255, 205, 86, 1)',
+        'rgba(75, 192, 192, 1)',
+        'rgba(153, 102, 255, 1)',
+      ],
+      borderWidth: 1,
+    }]
+  });
+
+  useEffect(() => {
+    // Fetch dashboard statistics
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      // In a real application, these would be API calls to backend endpoints
+      // const statsResponse = await axios.get('/api/dashboard/stats');
+      // const ordersResponse = await axios.get('/api/orders/recent');
+      // const productsResponse = await axios.get('/api/products/popular');
+      // const revenueResponse = await axios.get('/api/analytics/revenue');
+      // const ordersTrendResponse = await axios.get('/api/analytics/orders-trend');
+
+      // For now, we'll use mock data but with a structure that simulates API responses
+      setStats([
+        { title: 'Заказов сегодня', value: '150', icon: '📦' },
+        { title: 'Выручка сегодня', value: '75,000₽', icon: '💰' },
+        { title: 'Новые клиенты', value: '12', icon: '👥' },
+        { title: 'Наполнение', value: '45%', icon: '📊' },
+      ]);
+
+      setRecentOrders([
+        { id: '001234', customer: 'Иван И.', amount: '1,250₽', type: 'Доставка' },
+        { id: '001233', customer: 'Анна С.', amount: '850₽', type: 'Самовывоз' },
+        { id: '001232', customer: 'Петр К.', amount: '2,100₽', type: 'Доставка' },
+      ]);
+
+      setPopularProducts([
+        { name: 'Пицца Маргарита', sales: 45 },
+        { name: 'Бургер Чизбургер', sales: 38 },
+        { name: 'Кофе Латте', sales: 52 },
+      ]);
+
+      setRevenueData({
+        labels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+        datasets: [{
+          label: 'Выручка',
+          data: [12000, 19000, 15000, 18000, 22000, 28000, 25000],
+          backgroundColor: 'rgba(54, 162, 235, 0.5)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          borderWidth: 1,
+        }]
+      });
+
+      setOrdersData({
+        labels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+        datasets: [{
+          label: 'Заказы',
+          data: [15, 23, 18, 22, 27, 35, 31],
+          fill: false,
+          backgroundColor: 'rgba(75, 192, 192, 0.5)',
+          borderColor: 'rgba(75, 192, 192, 1)',
+          tension: 0.1,
+        }]
+      });
+
+      setPopularProductsData({
+        labels: ['Пицца Маргарита', 'Бургер', 'Кофе', 'Паста', 'Салат'],
+        datasets: [{
+          data: [35, 25, 20, 12, 8],
+          backgroundColor: [
+            'rgba(255, 99, 132, 0.5)',
+            'rgba(54, 162, 235, 0.5)',
+            'rgba(255, 205, 86, 0.5)',
+            'rgba(75, 192, 192, 0.5)',
+            'rgba(153, 102, 255, 0.5)',
+          ],
+          borderColor: [
+            'rgba(255, 99, 132, 1)',
+            'rgba(54, 162, 235, 1)',
+            'rgba(255, 205, 86, 1)',
+            'rgba(75, 192, 192, 1)',
+            'rgba(153, 102, 255, 1)',
+          ],
+          borderWidth: 1,
+        }]
+      });
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    }
   };
-
-  const ordersData = {
-    labels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
-    datasets: [
-      {
-        label: 'Заказы',
-        data: [15, 23, 18, 22, 27, 35, 31],
-        fill: false,
-        backgroundColor: 'rgba(75, 192, 192, 0.5)',
-        borderColor: 'rgba(75, 192, 192, 1)',
-        tension: 0.1,
-      },
-    ],
-  };
-
-  const popularProductsData = {
-    labels: ['Пицца Маргарита', 'Бургер', 'Кофе', 'Паста', 'Салат'],
-    datasets: [
-      {
-        data: [35, 25, 20, 12, 8],
-        backgroundColor: [
-          'rgba(255, 99, 132, 0.5)',
-          'rgba(54, 162, 235, 0.5)',
-          'rgba(255, 205, 86, 0.5)',
-          'rgba(75, 192, 192, 0.5)',
-          'rgba(153, 102, 255, 0.5)',
-        ],
-        borderColor: [
-          'rgba(255, 99, 132, 1)',
-          'rgba(54, 162, 235, 1)',
-          'rgba(255, 205, 86, 1)',
-          'rgba(75, 192, 192, 1)',
-          'rgba(153, 102, 255, 1)',
-        ],
-        borderWidth: 1,
-      },
-    ],
-  };
-
-  const stats = [
-    { title: 'Заказов сегодня', value: 150, icon: '📦' },
-    { title: 'Выручка сегодня', value: '75,000₽', icon: '💰' },
-    { title: 'Новые клиенты', value: 12, icon: '👥' },
-    { title: 'Наполнение', value: '45%', icon: '📊' },
-  ];
-
-  const recentOrders = [
-    { id: '001234', customer: 'Иван И.', amount: '1,250₽', type: 'Доставка' },
-    { id: '001233', customer: 'Анна С.', amount: '850₽', type: 'Самовывоз' },
-    { id: '001232', customer: 'Петр К.', amount: '2,100₽', type: 'Доставка' },
-  ];
-
-  const popularProducts = [
-    { name: 'Пицца Маргарита', sales: 45 },
-    { name: 'Бургер Чизбургер', sales: 38 },
-    { name: 'Кофе Латте', sales: 52 },
-  ];
 
   return (
     <Box sx={{ flexGrow: 1 }}>
