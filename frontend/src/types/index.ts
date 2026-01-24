@@ -1,4 +1,12 @@
-// Типы для товаров
+// Типы для тегов
+export interface Tag {
+  id: string;
+  name: string;
+  color: string;
+  icon?: string;
+  isActive: boolean;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -183,7 +191,7 @@ export interface OrderItem {
   price: number; // цена единицы с учетом опций
 }
 
-export type OrderStatus = 
+export type OrderStatus =
   | 'created'
   | 'confirmed'
   | 'preparing'
@@ -236,15 +244,6 @@ export interface PromotionConditions {
   targetGroups?: ('new_users' | 'regular_customers' | 'all')[];
   maxUsesPerUser?: number;
   totalMaxUses?: number;
-}
-
-// Типы для тегов
-export interface Tag {
-  id: string;
-  name: string;
-  color: string;
-  icon?: string;
-  isActive: boolean;
 }
 
 // Типы для ответов API
