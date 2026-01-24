@@ -2,7 +2,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from users.models import User, UserAddress
-from restaurants.models import RestaurantBranch
+from restaurants.models import Restaurant, RestaurantBranch
 from catalog.models import Product, OptionValue
 from decimal import Decimal
 

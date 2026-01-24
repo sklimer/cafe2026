@@ -1,16 +1,16 @@
 from rest_framework import serializers
-from ..users.models import User, UserAddress
-from ..restaurants.models import Restaurant, RestaurantBranch
-from ..catalog.models import Category, Product, Tag, ProductOption, OptionValue
-from ..orders.models import Order, OrderItem, Cart, CartItem, PromoCode, BonusRule, UserBonusTransaction
-from ..payments.models import Payment
+from users.models import User, UserAddress
+from restaurants.models import Restaurant, RestaurantBranch
+from catalog.models import Category, Product, Tag, ProductOption, OptionValue
+from orders.models import Order, OrderItem, Cart, CartItem, PromoCode, BonusRule, UserBonusTransaction
+from payments.models import Payment
 
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'telegram_id', 'username', 'first_name', 'last_name', 
+            'id', 'telegram_id', 'username', 'first_name', 'last_name',
             'phone', 'email', 'language_code', 'is_premium',
             'total_orders', 'total_spent', 'bonus_balance', 'bonus_percent_allowed',
             'referral_code', 'referred_by', 'referral_count',
@@ -24,7 +24,7 @@ class UserAddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserAddress
         fields = [
-            'id', 'alias', 'address', 'city', 'street', 'house', 
+            'id', 'alias', 'address', 'city', 'street', 'house',
             'entrance', 'floor', 'apartment', 'intercom', 'comment',
             'latitude', 'longitude', 'geolocation_accuracy',
             'is_default', 'is_verified', 'created_at', 'updated_at'
@@ -43,7 +43,7 @@ class RestaurantSerializer(serializers.ModelSerializer):
     class Meta:
         model = Restaurant
         fields = [
-            'id', 'name', 'slug', 'description', 'logo_url', 
+            'id', 'name', 'slug', 'description', 'logo_url',
             'cover_url', 'contact_phone', 'branches_count'
         ]
 
@@ -60,7 +60,7 @@ class RestaurantBranchSerializer(serializers.ModelSerializer):
             'id', 'name', 'restaurant', 'restaurant_name', 'address',
             'city', 'latitude', 'longitude', 'phone', 'business_hours',
             'min_order_amount', 'delivery_fee', 'free_delivery_threshold',
-            'delivery_radius_meters', 'accepted_payment_methods', 
+            'delivery_radius_meters', 'accepted_payment_methods',
             'is_accepting_orders'
         ]
 
@@ -118,7 +118,7 @@ class ProductSerializer(serializers.ModelSerializer):
     def get_options(self, obj):
         # Return the options available for this product
         # This requires defining a reverse relation in models
-        from ..catalog.models import ProductOptionMapping
+        from catalog.models import ProductOptionMapping
         option_mappings = ProductOptionMapping.objects.filter(product=obj).select_related('option')
         options = [mapping.option for mapping in option_mappings]
         return ProductOptionSerializer(options, many=True, context=self.context).data
@@ -134,7 +134,7 @@ class ProductSerializer(serializers.ModelSerializer):
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = ['id', 'name', 'description', 'image_url', 'icon_url', 
+        fields = ['id', 'name', 'description', 'image_url', 'icon_url',
                  'display_order', 'is_active', 'is_visible', 'created_at', 'updated_at']
 
 
@@ -170,7 +170,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
         model = OrderItem
         fields = [
             'id', 'product', 'product_name', 'product_description', 'product_price',
-            'quantity', 'unit_price', 'subtotal', 'selected_options', 
+            'quantity', 'unit_price', 'subtotal', 'selected_options',
             'options_modifier', 'special_instructions', 'is_prepared', 'prepared_at'
         ]
 
@@ -205,7 +205,7 @@ class PromoCodeSerializer(serializers.ModelSerializer):
     class Meta:
         model = PromoCode
         fields = [
-            'id', 'name', 'code', 'promo_type', 'discount_amount', 
+            'id', 'name', 'code', 'promo_type', 'discount_amount',
             'discount_percentage', 'usage_limit', 'usage_limit_per_user',
             'min_order_amount', 'valid_from', 'valid_until', 'is_active',
             'usage_count', 'created_at', 'updated_at'

@@ -25,7 +25,7 @@ class Restaurant(models.Model):
     legal_address = models.TextField(blank=True)
     
     # Settings
-    timezone = models.CharField(max_length=50, default='Europe/Moscow')
+    timezone_name = models.CharField(max_length=50, default='Europe/Moscow')
     currency = models.CharField(max_length=3, default='RUB')
     default_language = models.CharField(max_length=10, default='ru')
     

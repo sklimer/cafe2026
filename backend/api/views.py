@@ -7,13 +7,13 @@ from django.shortcuts import get_object_or_404
 from django.contrib.auth import authenticate, login
 from django.http import JsonResponse
 from rest_framework_simplejwt.tokens import RefreshToken
-from ..users.models import User, UserAddress
-from ..restaurants.models import Restaurant, RestaurantBranch
-from ..catalog.models import Category, Product, Tag, ProductOption, OptionValue
-from ..orders.models import Order, OrderItem, Cart, CartItem, PromoCode, BonusRule, UserBonusTransaction
-from ..payments.models import Payment
+from users.models import User, UserAddress
+from restaurants.models import Restaurant, RestaurantBranch
+from catalog.models import Category, Product, Tag, ProductOption, OptionValue
+from orders.models import Order, OrderItem, Cart, CartItem, PromoCode, BonusRule, UserBonusTransaction
+from payments.models import Payment
 from .serializers import (
-    UserSerializer, UserAddressSerializer, RestaurantSerializer, 
+    UserSerializer, UserAddressSerializer, RestaurantSerializer,
     RestaurantBranchSerializer, CategorySerializer, ProductSerializer,
     TagSerializer, OrderSerializer, CartSerializer, PromoCodeSerializer,
     BonusRuleSerializer, UserBonusTransactionSerializer
@@ -24,7 +24,7 @@ class AuthViewSet(viewsets.ViewSet):
     """
     Аутентификация через Telegram и JWT
     """
-    
+
     @action(detail=False, methods=['post'])
     def telegram(self, request):
         """
@@ -43,7 +43,7 @@ class AuthViewSet(viewsets.ViewSet):
                 "refresh_token": "fake_refresh_token"
             }
         })
-    
+
     @action(detail=False, methods=['post'])
     def refresh(self, request):
         """
@@ -52,7 +52,7 @@ class AuthViewSet(viewsets.ViewSet):
         """
         # Implementation would go here
         return Response({"message": "Token refresh endpoint"})
-    
+
     @action(detail=False, methods=['post'])
     def logout(self, request):
         """
@@ -61,7 +61,7 @@ class AuthViewSet(viewsets.ViewSet):
         """
         # Implementation would go here
         return Response({"message": "Logout endpoint"})
-    
+
     @action(detail=False, methods=['get'])
     def me(self, request):
         """
@@ -78,7 +78,7 @@ class RestaurantViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = Restaurant.objects.filter(is_active=True)
     serializer_class = RestaurantSerializer
-    
+
     @action(detail=True, methods=['get'])
     def branches(self, request, pk=None):
         """
@@ -89,7 +89,7 @@ class RestaurantViewSet(viewsets.ReadOnlyModelViewSet):
         branches = RestaurantBranch.objects.filter(restaurant=restaurant, is_active=True)
         serializer = RestaurantBranchSerializer(branches, many=True)
         return Response(serializer.data)
-    
+
     @action(detail=True, methods=['get'])
     def menu(self, request, pk=None):
         """
@@ -108,7 +108,7 @@ class RestaurantBranchViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = RestaurantBranch.objects.filter(is_active=True)
     serializer_class = RestaurantBranchSerializer
-    
+
     @action(detail=True, methods=['get'])
     def availability(self, request, pk=None):
         """
@@ -120,18 +120,18 @@ class RestaurantBranchViewSet(viewsets.ReadOnlyModelViewSet):
         """
         branch = self.get_object()
         order_type = request.query_params.get('order_type', 'delivery')
-        
+
         # Placeholder implementation
         is_open = branch.is_open_now()
         can_accept_orders = branch.is_accepting_orders
-        
+
         return Response({
             'is_open': is_open,
             'can_accept_orders': can_accept_orders,
             'order_type': order_type,
             'preparation_time': f"{branch.preparation_time_min}-{branch.preparation_time_max} minutes"
         })
-    
+
     @action(detail=True, methods=['get'])
     def delivery_zones(self, request, pk=None):
         """
@@ -146,7 +146,7 @@ class RestaurantBranchViewSet(viewsets.ReadOnlyModelViewSet):
             'delivery_fee': float(branch.delivery_fee),
             'free_delivery_threshold': float(branch.free_delivery_threshold) if branch.free_delivery_threshold else None
         })
-    
+
     @action(detail=True, methods=['get'])
     def time_slots(self, request, pk=None):
         """
@@ -173,13 +173,13 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
     """
     from django_filters.rest_framework import DjangoFilterBackend
     from rest_framework import filters
-    
+
     queryset = Category.objects.filter(is_active=True, is_visible=True)
     serializer_class = CategorySerializer
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['restaurant', 'parent']
     ordering_fields = ['display_order', 'name']
-    
+
     @action(detail=True, methods=['get'])
     def products(self, request, pk=None):
         """
@@ -198,7 +198,7 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     """
     from django_filters.rest_framework import DjangoFilterBackend
     from rest_framework import filters
-    
+
     queryset = Product.objects.filter(is_available=True)
     serializer_class = ProductSerializer
     filter_backends = [filters.SearchFilter, DjangoFilterBackend, filters.OrderingFilter]
@@ -206,7 +206,7 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_fields = ['restaurant', 'category', 'is_popular', 'is_new',
                        'is_recommended', 'is_vegetarian', 'is_vegan', 'is_gluten_free']
     ordering_fields = ['display_order', 'price', 'created_at', 'popularity']
-    
+
     @action(detail=True, methods=['get'])
     def options(self, request, pk=None):
         """
@@ -217,7 +217,7 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
         # This would return the options available for this product
         # For now, returning a placeholder
         return Response({'product_id': product.id, 'options': []})
-    
+
     @action(detail=False, methods=['get'])
     def search(self, request):
         """
@@ -239,7 +239,7 @@ class TagViewSet(viewsets.ReadOnlyModelViewSet):
     Теги товаров
     """
     from django_filters.rest_framework import DjangoFilterBackend
-    
+
     queryset = Tag.objects.filter(is_active=True)
     serializer_class = TagSerializer
     filter_backends = [DjangoFilterBackend]
@@ -252,10 +252,10 @@ class OrderViewSet(viewsets.ModelViewSet):
     """
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
-    
+
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user)
-    
+
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
         """
@@ -267,7 +267,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         order.status = 'cancelled'
         order.save()
         return Response({'status': 'cancelled'})
-    
+
     @action(detail=True, methods=['get'])
     def status(self, request, pk=None):
         """
@@ -276,7 +276,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         """
         order = self.get_object()
         return Response({'status': order.status, 'order_number': order.order_number})
-    
+
     @action(detail=True, methods=['get'])
     def track(self, request, pk=None):
         """
@@ -302,10 +302,10 @@ class UserAddressViewSet(viewsets.ModelViewSet):
     """
     serializer_class = UserAddressSerializer
     permission_classes = [IsAuthenticated]
-    
+
     def get_queryset(self):
         return UserAddress.objects.filter(user=self.request.user)
-    
+
     @action(detail=False, methods=['post'])
     def geocode(self, request):
         """
@@ -320,7 +320,7 @@ class UserAddressViewSet(viewsets.ModelViewSet):
             'coordinates': {'lat': 55.7558, 'lng': 37.6176},
             'formatted_address': request.data.get('address', '')
         })
-    
+
     @action(detail=False, methods=['get'])
     def suggestions(self, request):
         """
@@ -343,7 +343,7 @@ class CartView(APIView):
     GET /api/v1/cart/
     """
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request):
         cart, created = Cart.objects.get_or_create(user=request.user)
         serializer = CartSerializer(cart)
@@ -363,7 +363,7 @@ class AddToCartView(APIView):
     }
     """
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request):
         # Implementation would go here
         return Response({'status': 'added'})
@@ -378,7 +378,7 @@ class UpdateCartItemView(APIView):
     }
     """
     permission_classes = [IsAuthenticated]
-    
+
     def put(self, request, item_id):
         # Implementation would go here
         return Response({'status': 'updated'})
@@ -390,7 +390,7 @@ class RemoveFromCartView(APIView):
     DELETE /api/v1/cart/remove/{item_id}/
     """
     permission_classes = [IsAuthenticated]
-    
+
     def delete(self, request, item_id):
         # Implementation would go here
         return Response({'status': 'removed'})
@@ -402,7 +402,7 @@ class ClearCartView(APIView):
     POST /api/v1/cart/clear/
     """
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request):
         # Implementation would go here
         return Response({'status': 'cleared'})
@@ -414,7 +414,7 @@ class ProfileView(APIView):
     GET /api/v1/profile/
     """
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request):
         serializer = UserSerializer(request.user)
         return Response(serializer.data)
@@ -426,7 +426,7 @@ class UserOrdersView(APIView):
     GET /api/v1/profile/orders/
     """
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request):
         orders = Order.objects.filter(user=request.user).order_by('-created_at')
         serializer = OrderSerializer(orders, many=True)
@@ -439,7 +439,7 @@ class BonusView(APIView):
     GET /api/v1/profile/bonus/
     """
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request):
         # Placeholder implementation
         return Response({
@@ -454,7 +454,7 @@ class ReferralView(APIView):
     GET /api/v1/profile/referral/
     """
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request):
         # Placeholder implementation
         return Response({
@@ -470,7 +470,7 @@ class BonusBalanceView(APIView):
     GET /api/v1/bonus/balance/
     """
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request):
         return Response({
             'balance': float(request.user.bonus_balance),
@@ -484,7 +484,7 @@ class BonusTransactionsView(APIView):
     GET /api/v1/bonus/transactions/
     """
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request):
         transactions = UserBonusTransaction.objects.filter(user=request.user).order_by('-created_at')
         serializer = UserBonusTransactionSerializer(transactions, many=True)
@@ -497,7 +497,7 @@ class BonusRulesView(APIView):
     GET /api/v1/bonus/rules/
     """
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request):
         rules = BonusRule.objects.filter(is_active=True)
         serializer = BonusRuleSerializer(rules, many=True)
@@ -515,11 +515,11 @@ class ValidatePromoCodeView(APIView):
     }
     """
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request):
         code = request.data.get('code')
         order_amount = request.data.get('order_amount')
-        
+
         try:
             promo_code = PromoCode.objects.get(code=code, is_active=True)
             # Placeholder validation logic
@@ -530,11 +530,11 @@ class ValidatePromoCodeView(APIView):
                         'discount_amount': float(promo_code.discount_amount) if promo_code.discount_amount else 0,
                         'discount_percentage': float(promo_code.discount_percentage) if promo_code.discount_percentage else 0
                     })
-            
-            return Response({'valid': False, 'message': 'Promo code is not valid'}, 
+
+            return Response({'valid': False, 'message': 'Promo code is not valid'},
                           status=status.HTTP_400_BAD_REQUEST)
         except PromoCode.DoesNotExist:
-            return Response({'valid': False, 'message': 'Invalid promo code'}, 
+            return Response({'valid': False, 'message': 'Invalid promo code'},
                           status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -565,7 +565,7 @@ class CreatePaymentView(APIView):
     }
     """
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request):
         # Implementation would go here
         return Response({
@@ -584,7 +584,7 @@ class PaymentStatusView(APIView):
     - payment_id: ID платежа
     """
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request):
         # Implementation would go here
         return Response({
@@ -600,7 +600,7 @@ class PaymentWebhookView(APIView):
     POST /api/v1/payments/webhook/
     """
     permission_classes = [AllowAny]
-    
+
     def post(self, request):
         # Implementation would go here
         return Response({'status': 'received'})
@@ -612,7 +612,7 @@ class RestaurantBranchesView(generics.ListAPIView):
     GET /api/v1/restaurants/{id}/branches/
     """
     serializer_class = RestaurantBranchSerializer
-    
+
     def get_queryset(self):
         restaurant_id = self.kwargs['pk']
         return RestaurantBranch.objects.filter(
@@ -633,22 +633,22 @@ class RestaurantMenuView(APIView):
             is_active=True,
             is_visible=True
         ).prefetch_related('products')
-        
+
         # Serialize the data
         from rest_framework import serializers
-        
+
         class MenuItemSerializer(serializers.ModelSerializer):
             class Meta:
                 model = Product
                 fields = ['id', 'name', 'price', 'description', 'main_image_url']
-        
+
         class MenuCategorySerializer(serializers.ModelSerializer):
             products = MenuItemSerializer(many=True, read_only=True)
-            
+
             class Meta:
                 model = Category
                 fields = ['id', 'name', 'description', 'products']
-        
+
         serializer = MenuCategorySerializer(categories, many=True)
         return Response(serializer.data)
 
@@ -659,7 +659,7 @@ class CategoryProductsView(generics.ListAPIView):
     GET /api/v1/categories/{id}/products/
     """
     serializer_class = ProductSerializer
-    
+
     def get_queryset(self):
         category_id = self.kwargs['pk']
         return Product.objects.filter(
@@ -684,7 +684,7 @@ class ProductSearchView(generics.ListAPIView):
     GET /api/v1/products/search/
     """
     serializer_class = ProductSerializer
-    
+
     def get_queryset(self):
         query = self.request.query_params.get('q', '')
         if query:
@@ -703,7 +703,7 @@ class BranchAvailabilityView(APIView):
     def get(self, request, pk):
         branch = get_object_or_404(RestaurantBranch, id=pk)
         order_type = request.query_params.get('order_type', 'delivery')
-        
+
         return Response({
             'is_open': branch.is_open_now(),
             'can_accept_orders': branch.is_accepting_orders,
@@ -750,7 +750,7 @@ class CancelOrderView(APIView):
     POST /api/v1/orders/{id}/cancel/
     """
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request, pk):
         order = get_object_or_404(Order, id=pk, user=request.user)
         order.status = 'cancelled'
@@ -764,7 +764,7 @@ class OrderStatusView(APIView):
     GET /api/v1/orders/{id}/status/
     """
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request, pk):
         order = get_object_or_404(Order, id=pk, user=request.user)
         return Response({
@@ -780,7 +780,7 @@ class OrderTrackingView(APIView):
     GET /api/v1/orders/{id}/track/
     """
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request, pk):
         order = get_object_or_404(Order, id=pk, user=request.user)
         return Response({
@@ -800,7 +800,7 @@ class GeocodeAddressView(APIView):
     POST /api/v1/addresses/geocode/
     """
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request):
         address = request.data.get('address', '')
         # Placeholder implementation
@@ -816,7 +816,7 @@ class AddressSuggestionsView(APIView):
     GET /api/v1/addresses/suggestions/
     """
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request):
         query = request.query_params.get('query', '')
         # Placeholder implementation
