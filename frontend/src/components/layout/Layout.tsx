@@ -24,7 +24,7 @@ const Layout: React.FC = () => {
       <main className={`pb-16 ${isTelegramWebApp ? 'pt-40' : 'pt-4'}`}> {/* Добавляем отступ сверху для статуса и снизу для нижней навигации */}
         <Outlet />
       </main>
-      {!isTelegramWebApp && (
+      {isTelegramWebApp && (
         <footer className="fixed bottom-0 w-full bg-white border-t p-2 text-center text-xs text-gray-500">
           Приложение работает в Telegram WebApp
         </footer>
