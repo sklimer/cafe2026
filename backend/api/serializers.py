@@ -58,9 +58,16 @@ class AdminRestaurantSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['created_at', 'updated_at']
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make slug field not required during creation
+        if not self.instance:  # Creation
+            self.fields['slug'].required = False
+            self.fields['slug'].allow_blank = True
+
     def validate_slug(self, value):
         # Make sure the slug is unique
-        if Restaurant.objects.filter(slug=value).exclude(pk=self.instance.pk if self.instance else None).exists():
+        if value and Restaurant.objects.filter(slug=value).exclude(pk=self.instance.pk if self.instance else None).exists():
             raise serializers.ValidationError("Slug должен быть уникальным")
         return value
 
