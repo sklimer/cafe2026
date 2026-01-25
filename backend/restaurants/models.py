@@ -58,6 +58,17 @@ class Restaurant(models.Model):
         return self.name
 
     def save(self, *args, **kwargs):
+        # Generate slug if not provided
+        if not self.slug:
+            from django.utils.text import slugify
+            import uuid
+            slug = slugify(self.name)
+            original_slug = slug
+            counter = 1
+            while Restaurant.objects.filter(slug=slug).exists():
+                slug = f"{original_slug}-{counter}"
+                counter += 1
+            self.slug = slug
         # Update updated_at timestamp
         self.updated_at = timezone.now()
         super().save(*args, **kwargs)
