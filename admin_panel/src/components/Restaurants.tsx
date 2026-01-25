@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -56,7 +55,15 @@ const Restaurants = () => {
       try {
         // Using API service to fetch real data
         const response = await restaurantsAPI.getAll();
-        setRestaurants(response.data);
+        console.log('API Response:', response);
+
+        // Исправлено: берем данные из results, а не из всего response.data
+        if (response.data && response.data.results) {
+          setRestaurants(response.data.results);
+        } else {
+          // Если API не использует пагинацию, то берем response.data напрямую
+          setRestaurants(response.data);
+        }
         setLoading(false);
       } catch (error) {
         console.error('Error fetching restaurants:', error);
@@ -130,7 +137,13 @@ const Restaurants = () => {
 
       // Refresh the list
       const response = await restaurantsAPI.getAll();
-      setRestaurants(response.data);
+
+      // Исправлено: берем данные из results, а не из всего response.data
+      if (response.data && response.data.results) {
+        setRestaurants(response.data.results);
+      } else {
+        setRestaurants(response.data);
+      }
 
       setOpenDialog(false);
       setFormData({
@@ -187,13 +200,20 @@ const Restaurants = () => {
       </Paper>
 
       <Paper sx={{ height: 600, width: '100%' }}>
-        <DataGrid
-          rows={restaurants}
-          columns={columns}
-          pageSize={10}
-          rowsPerPageOptions={[5, 10, 20]}
-          checkboxSelection
-        />
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+            <Typography>Загрузка...</Typography>
+          </Box>
+        ) : (
+          <DataGrid
+            rows={restaurants}
+            columns={columns}
+            pageSize={10}
+            rowsPerPageOptions={[5, 10, 20]}
+            checkboxSelection
+            loading={loading}
+          />
+        )}
       </Paper>
 
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>

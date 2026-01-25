@@ -62,7 +62,7 @@ class Restaurant(models.Model):
         if not self.slug:
             from django.utils.text import slugify
             import uuid
-            slug = slugify(self.name)
+            slug = slugify(self.name, allow_unicode=True)
             original_slug = slug
             counter = 1
             while Restaurant.objects.filter(slug=slug).exists():
