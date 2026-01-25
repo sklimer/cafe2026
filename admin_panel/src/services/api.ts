@@ -4,7 +4,7 @@ import { env } from '../config/env';
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: env.REACT_APP_API_URL || '/api/v1', // Use environment variable or default - API is under /api/v1
+  baseURL: env.REACT_APP_API_URL || '/api/', // Use environment variable or default - API is under /api/v1
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',

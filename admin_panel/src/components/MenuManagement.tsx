@@ -71,18 +71,24 @@ const MenuManagement = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Using API service to fetch real data
         const [categoriesRes, productsRes] = await Promise.allSettled([
           menuAPI.getCategories(),
           menuAPI.getProducts()
         ]);
 
         if (categoriesRes.status === 'fulfilled') {
-          setCategories(categoriesRes.value.data);
+          // Django возвращает пагинированный ответ, берем results
+          const data = categoriesRes.value.data;
+          const categoriesArray = data.results || data;
+          console.log('Categories data:', categoriesArray); // Для отладки
+          setCategories(categoriesArray);
         }
 
         if (productsRes.status === 'fulfilled') {
-          setProducts(productsRes.value.data);
+          const data = productsRes.value.data;
+          const productsArray = data.results || data;
+          console.log('Products data:', productsArray); // Для отладки
+          setProducts(productsArray);
         }
 
         setLoading(false);
