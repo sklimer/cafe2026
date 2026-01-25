@@ -1,48 +1,75 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from 'react-hot-toast';
+import React from 'react';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate
+} from 'react-router-dom';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+import Dashboard from './components/Dashboard';
+import Restaurants from './components/Restaurants';
+import MenuManagement from './components/MenuManagement';
+import Orders from './components/Orders';
+import Users from './components/Users';
+import Promotions from './components/Promotions';
+import Analytics from './components/Analytics';
+import Login from './components/Login';
+import Sidebar from './components/Sidebar';
+import Header from './components/Header';
 
-import MenuPage from './pages/MenuPage';
-import ProductPage from './pages/ProductPage';
-import AddressesPage from './pages/AddressesPage';
-import ProfilePage from './pages/ProfilePage';
-import PromotionsPage from './pages/PromotionsPage';
-import CategoryPage from './pages/CategoryPage';
-import CheckoutPage from './pages/CheckoutPage';
-import OrdersPage from './pages/OrdersPage';
-import OrderDetailsPage from './pages/OrderDetailsPage';
-import Layout from './components/layout/Layout';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      retry: 1,
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: '#1976d2',
+    },
+    secondary: {
+      main: '#dc004e',
+    },
+    background: {
+      default: '#f5f5f5',
     },
   },
 });
 
+// Protected Route Component
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const token = localStorage.getItem('admin_token');
+  return token ? <>{children}</> : <Navigate to="/login" />;
+};
+
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
       <Router>
         <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<MenuPage />} />
-            <Route path="/menu/:restaurantId" element={<MenuPage />} />
-            <Route path="/product/:productId" element={<ProductPage />} />
-            <Route path="/addresses" element={<AddressesPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/promotions" element={<PromotionsPage />} />
-            <Route path="/category/:categoryId" element={<CategoryPage />} />
-            <Route path="/checkout" element={<CheckoutPage />} />
-            <Route path="/orders" element={<OrdersPage />} />
-            <Route path="/order/:orderId" element={<OrderDetailsPage />} />
-          </Route>
+          <Route path="/login" element={<Login />} />
+          <Route path="/*" element={
+            <ProtectedRoute>
+              <div style={{ display: 'flex' }}>
+                <Sidebar />
+                <div style={{ flexGrow: 1 }}>
+                  <Header />
+                  <main style={{ padding: '20px' }}>
+                    <Routes>
+                      <Route path="/" element={<Dashboard />} />
+                      <Route path="/dashboard" element={<Dashboard />} />
+                      <Route path="/restaurants" element={<Restaurants />} />
+                      <Route path="/menu" element={<MenuManagement />} />
+                      <Route path="/orders" element={<Orders />} />
+                      <Route path="/users" element={<Users />} />
+                      <Route path="/promotions" element={<Promotions />} />
+                      <Route path="/analytics" element={<Analytics />} />
+                    </Routes>
+                  </main>
+                </div>
+              </div>
+            </ProtectedRoute>
+          } />
         </Routes>
       </Router>
-      <Toaster position="top-center" />
-    </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 
