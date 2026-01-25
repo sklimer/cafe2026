@@ -1,9 +1,10 @@
 // API service for admin panel
 import axios from 'axios';
+import { env } from '../config/env';
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || '/api', // Use environment variable or default
+  baseURL: env.REACT_APP_API_URL || '/api', // Use environment variable or default
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
