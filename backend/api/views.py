@@ -10,18 +10,119 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.db.models import Count, Sum, F
 from django.db.models.functions import TruncDate
 from django.utils import timezone
+from django.contrib.auth import authenticate, login, logout
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.hashers import check_password
+from django.middleware.csrf import get_token
+import json
 from datetime import timedelta
 from users.models import User, UserAddress
 from restaurants.models import Restaurant, RestaurantBranch
 from catalog.models import Category, Product, Tag, ProductOption, OptionValue
 from orders.models import Order, OrderItem, Cart, CartItem, PromoCode, BonusRule, UserBonusTransaction
 from payments.models import Payment
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 from .serializers import (
     UserSerializer, UserAddressSerializer, RestaurantSerializer,
     RestaurantBranchSerializer, CategorySerializer, ProductSerializer,
     TagSerializer, OrderSerializer, CartSerializer, PromoCodeSerializer,
     BonusRuleSerializer, UserBonusTransactionSerializer
 )
+
+
+@csrf_exempt
+def api_login(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            login_field = data.get('username')  # может быть email или telegram_id
+            password = data.get('password')
+
+            # Пробуем найти пользователя по email или telegram_id
+            try:
+                # Ищем по email
+                user = User.objects.get(email=login_field, is_active=True)
+            except User.DoesNotExist:
+                try:
+                    # Ищем по telegram_id (преобразуем в int, если это число)
+                    if login_field.isdigit():
+                        user = User.objects.get(telegram_id=int(login_field), is_active=True)
+                    else:
+                        user = None
+                except (User.DoesNotExist, ValueError):
+                    user = None
+
+            # Проверяем пароль и права
+            if user is not None and check_password(password, user.password) and user.is_staff:
+                login(request, user)
+                return JsonResponse({
+                    'success': True,
+                    'user': {
+                        'id': user.id,
+                        'email': user.email,
+                        'telegram_id': user.telegram_id,
+                        'first_name': user.first_name,
+                        'is_staff': user.is_staff,
+                        'is_superuser': user.is_superuser
+                    }
+                })
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Неверные данные или недостаточно прав'
+                }, status=401)
+
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'error': 'Неверный JSON'}, status=400)
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    return JsonResponse({'success': False, 'error': 'Метод не разрешен'}, status=405)
+
+
+# API для выхода
+@csrf_exempt
+def api_logout(request):
+    if request.method == 'POST':
+        logout(request)
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False, 'error': 'Метод не разрешен'}, status=405)
+
+
+# API для проверки аутентификации
+def api_check_auth(request):
+    if request.user.is_authenticated:
+        return JsonResponse({
+            'authenticated': True,
+            'user': {
+                'id': request.user.id,
+                'email': request.user.email,
+                'telegram_id': request.user.telegram_id,
+                'first_name': request.user.first_name,
+                'is_staff': request.user.is_staff,
+                'is_superuser': request.user.is_superuser
+            }
+        })
+    return JsonResponse({'authenticated': False}, status=401)
+
+
+# API для получения CSRF токена
+def api_csrf_token(request):
+    return JsonResponse({'csrfToken': get_token(request)})
 
 
 class AuthViewSet(viewsets.ViewSet):
@@ -221,7 +322,7 @@ class ProductViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, DjangoFilterBackend, filters.OrderingFilter]
     search_fields = ['name', 'description', 'short_description']
     filterset_fields = ['restaurant', 'category', 'is_available', 'is_popular', 'is_new',
-                       'is_recommended', 'is_vegetarian', 'is_vegan', 'is_gluten_free']
+                        'is_recommended', 'is_vegetarian', 'is_vegan', 'is_gluten_free']
     ordering_fields = ['display_order', 'price', 'created_at', 'popularity']
 
     def get_permissions(self):
@@ -558,14 +659,15 @@ class ValidatePromoCodeView(APIView):
                     return Response({
                         'valid': True,
                         'discount_amount': float(promo_code.discount_amount) if promo_code.discount_amount else 0,
-                        'discount_percentage': float(promo_code.discount_percentage) if promo_code.discount_percentage else 0
+                        'discount_percentage': float(
+                            promo_code.discount_percentage) if promo_code.discount_percentage else 0
                     })
 
             return Response({'valid': False, 'message': 'Promo code is not valid'},
-                          status=status.HTTP_400_BAD_REQUEST)
+                            status=status.HTTP_400_BAD_REQUEST)
         except PromoCode.DoesNotExist:
             return Response({'valid': False, 'message': 'Invalid promo code'},
-                          status=status.HTTP_400_BAD_REQUEST)
+                            status=status.HTTP_400_BAD_REQUEST)
 
 
 class ActivePromoCodesView(APIView):
@@ -573,6 +675,7 @@ class ActivePromoCodesView(APIView):
     Активные промокоды
     GET /api/v1/promo/active/
     """
+
     def get(self, request):
         from django.utils import timezone
         active_codes = PromoCode.objects.filter(
@@ -656,6 +759,7 @@ class RestaurantMenuView(APIView):
     Меню ресторана
     GET /api/v1/restaurants/{id}/menu/
     """
+
     def get(self, request, pk):
         restaurant = get_object_or_404(Restaurant, id=pk)
         categories = Category.objects.filter(
@@ -703,6 +807,7 @@ class ProductOptionsView(APIView):
     Опции товара
     GET /api/v1/products/{id}/options/
     """
+
     def get(self, request, pk):
         # Implementation would go here
         return Response({'product_id': pk, 'options': []})
@@ -730,6 +835,7 @@ class BranchAvailabilityView(APIView):
     Доступность филиала
     GET /api/v1/branches/{id}/availability/
     """
+
     def get(self, request, pk):
         branch = get_object_or_404(RestaurantBranch, id=pk)
         order_type = request.query_params.get('order_type', 'delivery')
@@ -747,6 +853,7 @@ class BranchDeliveryZonesView(APIView):
     Зоны доставки филиала
     GET /api/v1/branches/{id}/delivery_zones/
     """
+
     def get(self, request, pk):
         branch = get_object_or_404(RestaurantBranch, id=pk)
         return Response({
@@ -762,6 +869,7 @@ class BranchTimeSlotsView(APIView):
     Слоты времени филиала
     GET /api/v1/branches/{id}/time_slots/
     """
+
     def get(self, request, pk):
         # Placeholder implementation
         return Response({

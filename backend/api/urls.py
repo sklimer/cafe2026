@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
 
+
 app_name = 'api'
 
 # Create router and register ViewSets
@@ -27,7 +28,11 @@ router.register(r'addresses', views.UserAddressViewSet, basename='address')
 
 urlpatterns = [
     path('', include(router.urls)),
-
+    # авторизация для кастомной админки
+    path('api/auth/login/', views.api_login, name='api_login'),
+    path('api/auth/logout/', views.api_logout, name='api_logout'),
+    path('api/auth/check/', views.api_check_auth, name='api_check_auth'),
+    path('api/auth/csrf/', views.api_csrf_token, name='api_csrf_token'),
     # Additional endpoints that don't fit the standard ViewSet pattern
     path('cart/', views.CartView.as_view(), name='cart'),
     path('cart/add/', views.AddToCartView.as_view(), name='add-to-cart'),

@@ -1,33 +1,37 @@
 import React from 'react';
-import { AppBar, Toolbar, Typography, IconButton, Badge, Box } from '@mui/material';
-import NotificationsIcon from '@mui/icons-material/Notifications';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import { Navigate, useLocation } from 'react-router-dom';
+import { CircularProgress, Box } from '@mui/material';
+import { useAuth } from '../contexts/AuthContext';
 
-const Header = () => {
-  return (
-    <AppBar position="static" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
-      <Toolbar>
-        <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-          Админ-панель
-        </Typography>
-        
-        <IconButton size="large" aria-label="show 4 new mails" color="inherit">
-          <Badge badgeContent={4} color="error">
-            <NotificationsIcon />
-          </Badge>
-        </IconButton>
-        
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <IconButton color="inherit">
-            <AccountCircleIcon />
-          </IconButton>
-          <Typography variant="body1" sx={{ ml: 1 }}>
-            Администратор
-          </Typography>
-        </Box>
-      </Toolbar>
-    </AppBar>
-  );
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+}
+
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100vh',
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!user) {
+    // Сохраняем текущий путь, чтобы вернуться после входа
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  return <>{children}</>;
 };
 
-export default Header;
+export default ProtectedRoute;
