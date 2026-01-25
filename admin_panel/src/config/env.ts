@@ -17,5 +17,5 @@ if (typeof window !== 'undefined' && !window.process) {
 }
 
 export const env = {
-  REACT_APP_API_URL: import.meta.env.VITE_API_URL || window.process?.env.REACT_APP_API_URL || '/api',
+  REACT_APP_API_URL: import.meta.env.VITE_API_URL || window.process?.env.REACT_APP_API_URL || '/api/v1',
 };

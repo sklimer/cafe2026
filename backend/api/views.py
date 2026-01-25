@@ -7,6 +7,10 @@ from django.shortcuts import get_object_or_404
 from django.contrib.auth import authenticate, login
 from django.http import JsonResponse
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.db.models import Count, Sum, F
+from django.db.models.functions import TruncDate
+from django.utils import timezone
+from datetime import timedelta
 from users.models import User, UserAddress
 from restaurants.models import Restaurant, RestaurantBranch
 from catalog.models import Category, Product, Tag, ProductOption, OptionValue
@@ -167,18 +171,31 @@ class RestaurantBranchViewSet(viewsets.ReadOnlyModelViewSet):
         })
 
 
-class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
+class CategoryViewSet(viewsets.ModelViewSet):
     """
     Категории товаров
     """
     from django_filters.rest_framework import DjangoFilterBackend
     from rest_framework import filters
 
-    queryset = Category.objects.filter(is_active=True, is_visible=True)
+    queryset = Category.objects.all()  # Changed to all to allow admin management
     serializer_class = CategorySerializer
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ['restaurant', 'parent']
+    filterset_fields = ['restaurant', 'parent', 'is_active', 'is_visible']
     ordering_fields = ['display_order', 'name']
+
+    def get_permissions(self):
+        """
+        Instantiates and returns the list of permissions that this view requires.
+        """
+        from rest_framework.permissions import IsAuthenticated, AllowAny
+        if self.action in ['list', 'retrieve']:
+            # Public endpoints for frontend
+            permission_classes = []
+        else:
+            # Admin endpoints require authentication
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
 
     @action(detail=True, methods=['get'])
     def products(self, request, pk=None):
@@ -192,20 +209,33 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(serializer.data)
 
 
-class ProductViewSet(viewsets.ReadOnlyModelViewSet):
+class ProductViewSet(viewsets.ModelViewSet):
     """
     Товары
     """
     from django_filters.rest_framework import DjangoFilterBackend
     from rest_framework import filters
 
-    queryset = Product.objects.filter(is_available=True)
+    queryset = Product.objects.all()  # Changed to all to allow admin management
     serializer_class = ProductSerializer
     filter_backends = [filters.SearchFilter, DjangoFilterBackend, filters.OrderingFilter]
     search_fields = ['name', 'description', 'short_description']
-    filterset_fields = ['restaurant', 'category', 'is_popular', 'is_new',
+    filterset_fields = ['restaurant', 'category', 'is_available', 'is_popular', 'is_new',
                        'is_recommended', 'is_vegetarian', 'is_vegan', 'is_gluten_free']
     ordering_fields = ['display_order', 'price', 'created_at', 'popularity']
+
+    def get_permissions(self):
+        """
+        Instantiates and returns the list of permissions that this view requires.
+        """
+        from rest_framework.permissions import IsAuthenticated, AllowAny
+        if self.action in ['list', 'retrieve']:
+            # Public endpoints for frontend
+            permission_classes = []
+        else:
+            # Admin endpoints require authentication
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
 
     @action(detail=True, methods=['get'])
     def options(self, request, pk=None):
@@ -824,3 +854,140 @@ class AddressSuggestionsView(APIView):
             {'id': 1, 'address': f'{query}, Moscow, Russia'},
             {'id': 2, 'address': f'{query}, St. Petersburg, Russia'}
         ])
+
+
+class DashboardStatsView(APIView):
+    """
+    Статистика дашборда
+    GET /api/v1/dashboard/stats/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Only allow admin users to access dashboard stats
+        if not request.user.is_staff:
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Calculate dashboard statistics
+        today = timezone.now().date()
+        start_of_month = today.replace(day=1)
+
+        # Orders count
+        total_orders = Order.objects.count()
+        orders_today = Order.objects.filter(created_at__date=today).count()
+
+        # Revenue
+        total_revenue = Order.objects.aggregate(total=Sum('total_amount'))['total'] or 0
+        revenue_today = Order.objects.filter(created_at__date=today).aggregate(
+            total=Sum('total_amount')
+        )['total'] or 0
+
+        # Users
+        total_users = User.objects.count()
+        users_today = User.objects.filter(date_joined__date=today).count()
+
+        # Products
+        total_products = Product.objects.count()
+        active_products = Product.objects.filter(is_available=True).count()
+
+        stats = {
+            'total_orders': total_orders,
+            'orders_today': orders_today,
+            'total_revenue': float(total_revenue),
+            'revenue_today': float(revenue_today),
+            'total_users': total_users,
+            'users_today': users_today,
+            'total_products': total_products,
+            'active_products': active_products,
+            'date_updated': timezone.now().isoformat()
+        }
+
+        return Response(stats)
+
+
+class RecentOrdersView(APIView):
+    """
+    Последние заказы
+    GET /api/v1/dashboard/recent-orders/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Only allow admin users to access recent orders
+        if not request.user.is_staff:
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Get recent orders with basic information
+        recent_orders = Order.objects.select_related('user', 'branch').order_by('-created_at')[:10]
+
+        orders_data = []
+        for order in recent_orders:
+            orders_data.append({
+                'id': order.id,
+                'order_number': order.order_number,
+                'user': {
+                    'id': order.user.id,
+                    'full_name': order.user.full_name,
+                    'phone': order.user.phone
+                },
+                'branch': {
+                    'id': order.branch.id,
+                    'name': order.branch.name
+                },
+                'total_amount': float(order.total_amount),
+                'status': order.status,
+                'created_at': order.created_at.isoformat(),
+                'order_type': order.order_type
+            })
+
+        return Response({'orders': orders_data})
+
+
+class PopularProductsView(APIView):
+    """
+    Популярные продукты
+    GET /api/v1/dashboard/popular-products/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Only allow admin users to access popular products
+        if not request.user.is_staff:
+            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Get popular products based on order count
+        popular_products = OrderItem.objects.values(
+            'product_id',
+            'product_name'
+        ).annotate(
+            order_count=Count('product_id'),
+            total_quantity_sold=Sum('quantity')
+        ).order_by('-order_count')[:10]
+
+        products_data = []
+        for product in popular_products:
+            # Get the actual product to get more details
+            try:
+                product_obj = Product.objects.get(id=product['product_id'])
+                products_data.append({
+                    'id': product['product_id'],
+                    'name': product['product_name'],
+                    'order_count': product['order_count'],
+                    'total_quantity_sold': product['total_quantity_sold'],
+                    'price': float(product_obj.price),
+                    'is_available': product_obj.is_available,
+                    'main_image_url': product_obj.main_image_url
+                })
+            except Product.DoesNotExist:
+                # Fallback if product doesn't exist anymore
+                products_data.append({
+                    'id': product['product_id'],
+                    'name': product['product_name'],
+                    'order_count': product['order_count'],
+                    'total_quantity_sold': product['total_quantity_sold'],
+                    'price': 0,
+                    'is_available': False,
+                    'main_image_url': None
+                })
+
+        return Response({'products': products_data})
