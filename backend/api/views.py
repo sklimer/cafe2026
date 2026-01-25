@@ -29,7 +29,7 @@ from .serializers import (
     UserSerializer, UserAddressSerializer, RestaurantSerializer,
     RestaurantBranchSerializer, CategorySerializer, ProductSerializer,
     TagSerializer, OrderSerializer, CartSerializer, PromoCodeSerializer,
-    BonusRuleSerializer, UserBonusTransactionSerializer
+    BonusRuleSerializer, UserBonusTransactionSerializer, AdminRestaurantSerializer
 )
 
 
@@ -1106,3 +1106,59 @@ class PopularProductsView(APIView):
                 })
 
         return Response({'products': products_data})
+
+
+class AdminRestaurantViewSet(viewsets.ModelViewSet):
+    """
+    Управление ресторанами для администраторов
+    """
+    queryset = Restaurant.objects.all()
+    serializer_class = AdminRestaurantSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        """
+        Instantiates and returns the list of permissions that this view requires.
+        """
+        from rest_framework.permissions import IsAuthenticated
+
+        # All actions require authentication
+        permission_classes = [IsAuthenticated]
+
+        # Only staff users can modify restaurants
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            # For modification actions, ensure user is staff
+            class IsStaffPermission:
+                def has_permission(self, request, view):
+                    return request.user.is_staff and request.user.is_authenticated
+
+            permission_classes.append(IsStaffPermission)
+
+        return [permission() for permission in permission_classes]
+
+    def create(self, request, *args, **kwargs):
+        # Only staff users can create restaurants
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Permission denied'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        # Only staff users can update restaurants
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Permission denied'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        # Only staff users can delete restaurants
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Permission denied'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().destroy(request, *args, **kwargs)

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -29,17 +30,26 @@ import { restaurantsAPI } from '../services/api';
 interface Restaurant {
   id: number;
   name: string;
-  city: string;
-  status: 'active' | 'inactive' | 'pending';
-  branchCount: number;
-  orderCount: number;
-  totalRevenue: number;
-  verificationStatus: 'verified' | 'pending' | 'rejected';
+  slug: string;
+  description: string;
+  logo_url: string;
+  cover_url: string;
+  contact_phone: string;
+  is_active: boolean;
+  verification_status: 'verified' | 'pending' | 'rejected';
+  branches_count: number;
 }
 
 const Restaurants = () => {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [formData, setFormData] = useState({
+    name: '',
+    city: '',
+    description: '',
+    contact_phone: '',
+    status: 'active' as 'active' | 'inactive' | 'pending',
+  });
 
   useEffect(() => {
     const fetchRestaurants = async () => {
@@ -63,26 +73,23 @@ const Restaurants = () => {
   const columns: GridColDef[] = [
     { field: 'id', headerName: 'ID', width: 90 },
     { field: 'name', headerName: 'Название', width: 200 },
-    { field: 'city', headerName: 'Город', width: 150 },
+    { field: 'slug', headerName: 'Slug', width: 150 },
     {
-      field: 'status',
+      field: 'is_active',
       headerName: 'Статус',
       width: 120,
       renderCell: (params) => {
-        const status = params.value as string;
+        const isActive = params.value as boolean;
+        const status = isActive ? 'active' : 'inactive';
         let color = 'default';
-        if (status === 'active') color = 'success';
-        if (status === 'inactive') color = 'error';
-        if (status === 'pending') color = 'warning';
+        if (isActive) color = 'success';
+        else color = 'error';
 
         return <Chip label={status} color={color as any} />;
       }
     },
-    { field: 'branchCount', headerName: 'Филиалы', width: 100 },
-    { field: 'orderCount', headerName: 'Заказы', width: 100 },
-    { field: 'totalRevenue', headerName: 'Выручка', width: 150 },
     {
-      field: 'verificationStatus',
+      field: 'verification_status',
       headerName: 'Верификация',
       width: 150,
       renderCell: (params) => {
@@ -90,10 +97,13 @@ const Restaurants = () => {
         let color = 'default';
         if (status === 'verified') color = 'success';
         if (status === 'rejected') color = 'error';
+        if (status === 'pending') color = 'warning';
 
         return <Chip label={status} color={color as any} />;
       }
     },
+    { field: 'branches_count', headerName: 'Филиалы', width: 100 },
+    { field: 'contact_phone', headerName: 'Телефон', width: 150 },
   ];
 
   const handleAddRestaurant = () => {
@@ -104,9 +114,50 @@ const Restaurants = () => {
     setOpenDialog(false);
   };
 
-  const handleSubmit = () => {
-    // Handle form submission
-    setOpenDialog(false);
+  const handleSubmit = async () => {
+    try {
+      // Convert status to is_active and verification_status
+      const restaurantData = {
+        name: formData.name,
+        slug: formData.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+        description: formData.description || '',
+        contact_phone: formData.contact_phone || '',
+        is_active: formData.status === 'active',
+        verification_status: formData.status === 'pending' ? 'pending' : 'verified',
+      };
+
+      await restaurantsAPI.create(restaurantData);
+
+      // Refresh the list
+      const response = await restaurantsAPI.getAll();
+      setRestaurants(response.data);
+
+      setOpenDialog(false);
+      setFormData({
+        name: '',
+        city: '',
+        description: '',
+        contact_phone: '',
+        status: 'active' as 'active' | 'inactive' | 'pending',
+      });
+    } catch (error: any) {
+      console.error('Error creating restaurant:', error);
+      let errorMessage = 'Ошибка при создании ресторана';
+      if (error.response && error.response.data) {
+        const errorData = error.response.data;
+        if (typeof errorData === 'object') {
+          errorMessage += ': ';
+          Object.keys(errorData).forEach(key => {
+            if (Array.isArray(errorData[key])) {
+              errorMessage += `${key}: ${errorData[key].join(', ')}. `;
+            } else {
+              errorMessage += `${key}: ${errorData[key]}. `;
+            }
+          });
+        }
+      }
+      alert(errorMessage);
+    }
   };
 
   return (
@@ -155,6 +206,8 @@ const Restaurants = () => {
               label="Название"
               fullWidth
               variant="outlined"
+              value={formData.name}
+              onChange={(e) => setFormData({...formData, name: e.target.value})}
               sx={{ mb: 2 }}
             />
             <TextField
@@ -162,6 +215,8 @@ const Restaurants = () => {
               label="Город"
               fullWidth
               variant="outlined"
+              value={formData.city}
+              onChange={(e) => setFormData({...formData, city: e.target.value})}
               sx={{ mb: 2 }}
             />
             <TextField
@@ -171,11 +226,26 @@ const Restaurants = () => {
               multiline
               rows={3}
               variant="outlined"
+              value={formData.description}
+              onChange={(e) => setFormData({...formData, description: e.target.value})}
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              margin="dense"
+              label="Контактный телефон"
+              fullWidth
+              variant="outlined"
+              value={formData.contact_phone}
+              onChange={(e) => setFormData({...formData, contact_phone: e.target.value})}
               sx={{ mb: 2 }}
             />
             <FormControl fullWidth sx={{ mb: 2 }}>
               <InputLabel>Статус</InputLabel>
-              <Select label="Статус">
+              <Select
+                label="Статус"
+                value={formData.status}
+                onChange={(e) => setFormData({...formData, status: e.target.value as 'active' | 'inactive' | 'pending'})}
+              >
                 <MenuItem value="active">Активный</MenuItem>
                 <MenuItem value="inactive">Неактивный</MenuItem>
                 <MenuItem value="pending">Ожидает</MenuItem>

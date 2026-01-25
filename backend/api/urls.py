@@ -1,3 +1,4 @@
+
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
@@ -14,6 +15,8 @@ router.register(r'auth', views.AuthViewSet, basename='auth')
 # Restaurant endpoints
 router.register(r'restaurants', views.RestaurantViewSet, basename='restaurant')
 router.register(r'branches', views.RestaurantBranchViewSet, basename='branch')
+# Admin restaurant management
+router.register(r'admin/restaurants', views.AdminRestaurantViewSet, basename='admin-restaurant')
 
 # Catalog endpoints
 router.register(r'categories', views.CategoryViewSet, basename='category')

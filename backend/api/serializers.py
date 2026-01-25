@@ -1,3 +1,4 @@
+
 from rest_framework import serializers
 from users.models import User, UserAddress
 from restaurants.models import Restaurant, RestaurantBranch
@@ -49,6 +50,37 @@ class RestaurantSerializer(serializers.ModelSerializer):
 
     def get_branches_count(self, obj):
         return obj.branches.filter(is_active=True).count()
+
+
+class AdminRestaurantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Restaurant
+        fields = '__all__'
+        read_only_fields = ['created_at', 'updated_at']
+
+    def validate_slug(self, value):
+        # Make sure the slug is unique
+        if Restaurant.objects.filter(slug=value).exclude(pk=self.instance.pk if self.instance else None).exists():
+            raise serializers.ValidationError("Slug должен быть уникальным")
+        return value
+
+    def create(self, validated_data):
+        # Auto-generate slug from name if not provided
+        if 'slug' not in validated_data or not validated_data['slug']:
+            name = validated_data.get('name', '')
+            slug = name.lower().replace(' ', '-').replace('_', '-')
+            # Remove special characters
+            import re
+            slug = re.sub(r'[^a-z0-9-]', '', slug)
+            # Ensure uniqueness
+            original_slug = slug
+            counter = 1
+            while Restaurant.objects.filter(slug=slug).exists():
+                slug = f"{original_slug}-{counter}"
+                counter += 1
+            validated_data['slug'] = slug
+
+        return super().create(validated_data)
 
 
 class RestaurantBranchSerializer(serializers.ModelSerializer):

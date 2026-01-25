@@ -1,3 +1,4 @@
+
 // API service for admin panel
 import axios from 'axios';
 import { env } from '../config/env';
@@ -113,12 +114,12 @@ export const usersAPI = {
 
 // Restaurants API endpoints
 export const restaurantsAPI = {
-  getAll: (params?: any) => api.get('/restaurants', params),
-  getById: (id: number) => api.get(`/restaurants/${id}`),
-  update: (id: number, data: any) => api.put(`/restaurants/${id}/`, data),
-  create: (data: any) => api.post('/restaurants/', data),
-  delete: (id: number) => api.delete(`/restaurants/${id}/`),
-  verify: (id: number, verified: boolean) => api.patch(`/restaurants/${id}/verify/`, { verified }),
+  getAll: (params?: any) => api.get('/admin/restaurants', params),
+  getById: (id: number) => api.get(`/admin/restaurants/${id}`),
+  update: (id: number, data: any) => api.put(`/admin/restaurants/${id}/`, data),
+  create: (data: any) => api.post('/admin/restaurants/', data),
+  delete: (id: number) => api.delete(`/admin/restaurants/${id}/`),
+  verify: (id: number, verified: boolean) => api.patch(`/admin/restaurants/${id}/verify/`, { verified }),
 };
 
 // Promotions API endpoints
