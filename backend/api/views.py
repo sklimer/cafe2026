@@ -24,18 +24,6 @@ from orders.models import Order, OrderItem, Cart, CartItem, PromoCode, BonusRule
 from payments.models import Payment
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 from .serializers import (
     UserSerializer, UserAddressSerializer, RestaurantSerializer,
     RestaurantBranchSerializer, CategorySerializer, ProductSerializer,

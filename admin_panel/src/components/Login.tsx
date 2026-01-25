@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Container,
@@ -24,28 +24,89 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { user, login } = useAuth();
 
   const from = (location.state as any)?.from?.pathname || '/dashboard';
+
+  // Эффект для перенаправления при изменении пользователя
+  useEffect(() => {
+    console.log('[LOGIN PAGE] Текущий пользователь:', user);
+    console.log('[LOGIN PAGE] Состояние location:', location);
+    console.log('[LOGIN PAGE] Перенаправление на:', from);
+
+    if (user) {
+      console.log('[LOGIN PAGE] Пользователь найден, перенаправление в:', from);
+      console.log('[LOGIN PAGE] Данные пользователя:', {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        is_staff: user.is_staff
+      });
+
+      // Добавляем небольшую задержку для уверенности, что состояние обновилось
+      const redirectTimer = setTimeout(() => {
+        navigate(from, { replace: true });
+      }, 100);
+
+      return () => clearTimeout(redirectTimer);
+    }
+  }, [user, navigate, from, location]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
+    console.log('[LOGIN PAGE] Начало входа', { username });
+
     try {
       const success = await login(username, password);
+      console.log('[LOGIN PAGE] Результат входа:', success);
+
       if (success) {
-        navigate(from, { replace: true });
+        console.log('[LOGIN PAGE] Вход успешен, должен произойти редирект через useEffect');
+        // Не вызываем navigate здесь, это сделает useEffect
+        // navigate(from, { replace: true });
       } else {
         setError('Неверное имя пользователя или пароль');
+        console.log('[LOGIN PAGE] Вход не удался');
       }
     } catch (err) {
       setError('Произошла ошибка при входе');
+      console.error('[LOGIN PAGE] Ошибка при входе:', err);
     } finally {
       setLoading(false);
     }
   };
+
+  // Если пользователь уже авторизован, показываем сообщение о перенаправлении
+  if (user) {
+    return (
+      <Container component="main" maxWidth="xs">
+        <Box
+          sx={{
+            marginTop: 8,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}
+        >
+          <Avatar sx={{ m: 1, bgcolor: 'secondary.main' }}>
+            <LockOutlinedIcon />
+          </Avatar>
+          <Typography component="h1" variant="h5">
+            Перенаправление...
+          </Typography>
+          <Paper elevation={3} sx={{ p: 4, mt: 3, width: '100%', textAlign: 'center' }}>
+            <CircularProgress sx={{ mb: 2 }} />
+            <Typography variant="body1">
+              Вы уже авторизованы. Перенаправляем на дашборд...
+            </Typography>
+          </Paper>
+        </Box>
+      </Container>
+    );
+  }
 
   return (
     <>
