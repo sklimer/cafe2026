@@ -46,21 +46,55 @@ import { menuAPI } from '../services/api';
 interface Category {
   id: number;
   name: string;
-  parentId: number | null;
-  level: number;
-  childCount: number;
+  parent: number | null;
+  restaurant: number;
+  description?: string;
+  image_url?: string;
+  icon_url?: string;
+  display_order?: number;
+  is_active?: boolean;
+  is_visible?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface Product {
   id: number;
   name: string;
-  category: string;
+  category: number;
   price: number;
-  costPrice: number;
-  isAvailable: boolean;
-  stockQuantity: number;
-  orderCount: number;
-  tags: string[];
+  cost_price: number;
+  is_available: boolean;
+  stock_quantity: number;
+  description: string;
+  restaurant: number;
+  old_price?: number;
+  profit_margin?: number;
+  weight_grams?: number;
+  volume_ml?: number;
+  calories?: number;
+  proteins?: number;
+  fats?: number;
+  carbohydrates?: number;
+  main_image_url?: string;
+  image_urls?: string[];
+  video_url?: string;
+  is_popular?: boolean;
+  is_new?: boolean;
+  is_recommended?: boolean;
+  is_spicy?: boolean;
+  is_vegetarian?: boolean;
+  is_vegan?: boolean;
+  is_gluten_free?: boolean;
+  cooking_time_minutes?: number;
+  preparation_instructions?: string;
+  display_order?: number;
+  seo_title?: string;
+  seo_description?: string;
+  seo_keywords?: string[];
+  created_at?: string;
+  updated_at?: string;
+  tags?: string[];
 }
 
 const MenuManagement = () => {
@@ -77,16 +111,16 @@ const MenuManagement = () => {
         ]);
 
         if (categoriesRes.status === 'fulfilled') {
-          // Django возвращает пагинированный ответ, берем results
+          // Django возвращает пагинированный ответ, берем results или используем весь объект
           const data = categoriesRes.value.data;
-          const categoriesArray = data.results || data;
+          const categoriesArray = Array.isArray(data) ? data : (data.results || []);
           console.log('Categories data:', categoriesArray); // Для отладки
           setCategories(categoriesArray);
         }
 
         if (productsRes.status === 'fulfilled') {
           const data = productsRes.value.data;
-          const productsArray = data.results || data;
+          const productsArray = Array.isArray(data) ? data : (data.results || []);
           console.log('Products data:', productsArray); // Для отладки
           setProducts(productsArray);
         }
@@ -105,6 +139,22 @@ const MenuManagement = () => {
   const [openProductDialog, setOpenProductDialog] = useState(false);
   const [openCategoryDialog, setOpenCategoryDialog] = useState(false);
   const [currentTab, setCurrentTab] = useState(0);
+
+  // States for form data
+  const [productForm, setProductForm] = useState({
+    name: '',
+    categoryId: '',
+    price: '',
+    costPrice: '',
+    isAvailable: true,
+    stockQuantity: '',
+    tags: ''
+  });
+
+  const [categoryForm, setCategoryForm] = useState({
+    name: '',
+    parentId: ''
+  });
 
   const productColumns: GridColDef[] = [
     {
@@ -125,26 +175,33 @@ const MenuManagement = () => {
       )
     },
     { field: 'name', headerName: 'Название', width: 200 },
-    { field: 'category', headerName: 'Категория', width: 150 },
-    { field: 'price', headerName: 'Цена', width: 100, valueFormatter: (params) => `${params.value}₽` },
-    { field: 'costPrice', headerName: 'Себестоимость', width: 150, valueFormatter: (params) => `${params.value}₽` },
     {
-      field: 'isAvailable',
+      field: 'category',
+      headerName: 'Категория',
+      width: 150,
+      valueGetter: (params) => {
+        const category = categories.find(cat => cat.id === params.row.category);
+        return category ? category.name : 'Не указана';
+      }
+    },
+    { field: 'price', headerName: 'Цена', width: 100, valueFormatter: (params) => `${params.value}₽` },
+    { field: 'cost_price', headerName: 'Себестоимость', width: 150, valueFormatter: (params) => `${params.value}₽` },
+    {
+      field: 'is_available',
       headerName: 'Доступен',
       width: 100,
       renderCell: (params) => (
         <Switch checked={params.value} />
       )
     },
-    { field: 'stockQuantity', headerName: 'Остаток', width: 100 },
-    { field: 'orderCount', headerName: 'Заказов', width: 100 },
+    { field: 'stock_quantity', headerName: 'Остаток', width: 100 },
     {
       field: 'tags',
       headerName: 'Теги',
       width: 150,
       renderCell: (params) => (
         <Box>
-          {params.value.map((tag: string, index: number) => (
+          {(params.value || []).map((tag: string, index: number) => (
             <Chip key={index} label={tag} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
           ))}
         </Box>
@@ -177,23 +234,147 @@ const MenuManagement = () => {
 
   const handleCloseProductDialog = () => {
     setOpenProductDialog(false);
+    // Reset form
+    setProductForm({
+      name: '',
+      categoryId: '',
+      price: '',
+      costPrice: '',
+      isAvailable: true,
+      stockQuantity: '',
+      tags: ''
+    });
   };
 
   const handleCloseCategoryDialog = () => {
     setOpenCategoryDialog(false);
+    // Reset form
+    setCategoryForm({
+      name: '',
+      parentId: ''
+    });
   };
 
-  const handleSubmitProduct = () => {
-    // Handle form submission
-    setOpenProductDialog(false);
+  const handleProductFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setProductForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
-  const handleSubmitCategory = () => {
-    // Handle form submission
-    setOpenCategoryDialog(false);
+  const handleCategoryFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setCategoryForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleProductSelectChange = (name: string, value: any) => {
+    setProductForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleCategorySelectChange = (name: string, value: any) => {
+    setCategoryForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmitProduct = async () => {
+    try {
+      // First, get the current user's restaurant ID or use a default one
+      // For now, we'll fetch the first available restaurant or use a default ID
+      const productData = {
+        name: productForm.name,
+        category: parseInt(productForm.categoryId) || null,
+        price: parseFloat(productForm.price) || 0,
+        cost_price: parseFloat(productForm.costPrice) || 0,
+        is_available: productForm.isAvailable,
+        stock_quantity: parseInt(productForm.stockQuantity) || 0,
+        description: productForm.name, // Using name as description for now
+        restaurant: 1, // We need to either fetch the user's restaurant or use a default
+        tags: productForm.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
+      };
+
+      await menuAPI.createProduct(productData);
+
+      // Refresh the products list
+      const response = await menuAPI.getProducts();
+      const productsArray = response.data.results || response.data;
+      setProducts(productsArray);
+
+      setOpenProductDialog(false);
+      // Reset form
+      setProductForm({
+        name: '',
+        categoryId: '',
+        price: '',
+        costPrice: '',
+        isAvailable: true,
+        stockQuantity: '',
+        tags: ''
+      });
+    } catch (error) {
+      console.error('Error creating product:', error);
+      alert('Ошибка при создании товара');
+    }
+  };
+
+  const handleSubmitCategory = async () => {
+    try {
+      const categoryData = {
+        name: categoryForm.name,
+        parent: categoryForm.parentId ? parseInt(categoryForm.parentId) : null,
+        restaurant: 1 // We need to either fetch the user's restaurant or use a default
+      };
+
+      await menuAPI.createCategory(categoryData);
+
+      // Refresh the categories list
+      const response = await menuAPI.getCategories();
+      const categoriesArray = response.data.results || response.data;
+      setCategories(categoriesArray);
+
+      setOpenCategoryDialog(false);
+      // Reset form
+      setCategoryForm({
+        name: '',
+        parentId: ''
+      });
+    } catch (error) {
+      console.error('Error creating category:', error);
+      alert('Ошибка при создании категории');
+    }
   };
 
   const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
+
+  // Calculate category level and child count
+  const getCategoryLevel = (category: Category, allCategories: Category[]): number => {
+    let level = 0;
+    let currentParentId = category.parent;
+
+    while (currentParentId) {
+      const parent = allCategories.find(cat => cat.id === currentParentId);
+      if (parent) {
+        level++;
+        currentParentId = parent.parent;
+      } else {
+        break;
+      }
+    }
+
+    return level;
+  };
+
+  const getChildCount = (categoryId: number, allCategories: Category[]): number => {
+    return allCategories.filter(cat => cat.parent === categoryId).length;
+  };
 
   const toggleCategory = (id: number) => {
     if (expandedCategories.includes(id)) {
@@ -204,12 +385,12 @@ const MenuManagement = () => {
   };
 
   const renderTree = (nodes: Category[], parentId: number | null = null) => {
-    const children = nodes.filter(node => node.parentId === parentId);
+    const children = nodes.filter(node => node.parent === parentId);
 
     return children.map(node => (
       <div key={node.id}>
         <ListItem button onClick={() => toggleCategory(node.id)}>
-          <ListItemText primary={`${node.name} (${node.childCount})`} />
+          <ListItemText primary={`${node.name} (${getChildCount(node.id, nodes)})`} />
           {expandedCategories.includes(node.id) ? <ExpandLess /> : <ExpandMore />}
         </ListItem>
         <Collapse in={expandedCategories.includes(node.id)}>
@@ -281,14 +462,22 @@ const MenuManagement = () => {
               autoFocus
               margin="dense"
               label="Название"
+              name="name"
+              value={productForm.name}
+              onChange={handleProductFormChange}
               fullWidth
               variant="outlined"
               sx={{ mb: 2 }}
             />
             <FormControl fullWidth sx={{ mb: 2 }}>
               <InputLabel>Категория</InputLabel>
-              <Select label="Категория">
-                {categories.filter(cat => cat.level === 0).map(cat => (
+              <Select
+                label="Категория"
+                value={productForm.categoryId || ''}
+                onChange={(e) => handleProductSelectChange('categoryId', e.target.value)}
+              >
+                <MenuItem value="">Выберите категорию</MenuItem>
+                {categories.filter(cat => cat.parent === null).map(cat => (
                   <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
                 ))}
               </Select>
@@ -296,6 +485,9 @@ const MenuManagement = () => {
             <TextField
               margin="dense"
               label="Цена"
+              name="price"
+              value={productForm.price}
+              onChange={handleProductFormChange}
               fullWidth
               variant="outlined"
               type="number"
@@ -304,19 +496,30 @@ const MenuManagement = () => {
             <TextField
               margin="dense"
               label="Себестоимость"
+              name="costPrice"
+              value={productForm.costPrice}
+              onChange={handleProductFormChange}
               fullWidth
               variant="outlined"
               type="number"
               sx={{ mb: 2 }}
             />
             <FormControlLabel
-              control={<Switch />}
+              control={
+                <Switch
+                  checked={productForm.isAvailable}
+                  onChange={(e) => handleProductSelectChange('isAvailable', e.target.checked)}
+                />
+              }
               label="Доступен"
               sx={{ mb: 2 }}
             />
             <TextField
               margin="dense"
               label="Остаток"
+              name="stockQuantity"
+              value={productForm.stockQuantity}
+              onChange={handleProductFormChange}
               fullWidth
               variant="outlined"
               type="number"
@@ -325,6 +528,9 @@ const MenuManagement = () => {
             <TextField
               margin="dense"
               label="Теги (через запятую)"
+              name="tags"
+              value={productForm.tags}
+              onChange={handleProductFormChange}
               fullWidth
               variant="outlined"
               sx={{ mb: 2 }}
@@ -346,15 +552,22 @@ const MenuManagement = () => {
               autoFocus
               margin="dense"
               label="Название"
+              name="name"
+              value={categoryForm.name}
+              onChange={handleCategoryFormChange}
               fullWidth
               variant="outlined"
               sx={{ mb: 2 }}
             />
             <FormControl fullWidth sx={{ mb: 2 }}>
               <InputLabel>Родительская категория</InputLabel>
-              <Select label="Родительская категория">
+              <Select
+                label="Родительская категория"
+                value={categoryForm.parentId || ''}
+                onChange={(e) => handleCategorySelectChange('parentId', e.target.value)}
+              >
                 <MenuItem value="">Без родителя</MenuItem>
-                {categories.filter(cat => cat.level === 0).map(cat => (
+                {categories.filter(cat => cat.parent === null).map(cat => (
                   <MenuItem key={cat.id} value={cat.id}>{cat.name}</MenuItem>
                 ))}
               </Select>

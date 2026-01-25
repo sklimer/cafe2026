@@ -50,56 +50,56 @@ export const dashboardAPI = {
 export const ordersAPI = {
   getAll: (params?: any) => api.get('/orders', params),
   getById: (id: number) => api.get(`/orders/${id}`),
-  updateStatus: (id: number, status: string) => api.put(`/orders/${id}/status`, { status }),
-  bulkUpdateStatus: (ids: number[], status: string) => api.put('/orders/bulk-status', { ids, status }),
-  create: (data: any) => api.post('/orders', data),
-  delete: (id: number) => api.delete(`/orders/${id}`),
+  updateStatus: (id: number, status: string) => api.put(`/orders/${id}/status/`, { status }),
+  bulkUpdateStatus: (ids: number[], status: string) => api.put('/orders/bulk-status/', { ids, status }),
+  create: (data: any) => api.post('/orders/', data),
+  delete: (id: number) => api.delete(`/orders/${id}/`),
 };
 
 // Menu API endpoints
 export const menuAPI = {
   getProducts: (params?: any) => api.get('/products', params),
   getProductById: (id: number) => api.get(`/products/${id}`),
-  createProduct: (data: any) => api.post('/products', data),
-  updateProduct: (id: number, data: any) => api.put(`/products/${id}`, data),
-  deleteProduct: (id: number) => api.delete(`/products/${id}`),
+  createProduct: (data: any) => api.post('/products/', data),
+  updateProduct: (id: number, data: any) => api.put(`/products/${id}/`, data),
+  deleteProduct: (id: number) => api.delete(`/products/${id}/`),
 
   getCategories: () => api.get('/categories'),
   getCategoryById: (id: number) => api.get(`/categories/${id}`),
-  createCategory: (data: any) => api.post('/categories', data),
-  updateCategory: (id: number, data: any) => api.put(`/categories/${id}`, data),
-  deleteCategory: (id: number) => api.delete(`/categories/${id}`),
+  createCategory: (data: any) => api.post('/categories/', data),
+  updateCategory: (id: number, data: any) => api.put(`/categories/${id}/`, data),
+  deleteCategory: (id: number) => api.delete(`/categories/${id}/`),
 };
 
 // Users API endpoints
 export const usersAPI = {
   getAll: (params?: any) => api.get('/users', params),
   getById: (id: number) => api.get(`/users/${id}`),
-  update: (id: number, data: any) => api.put(`/users/${id}`, data),
-  bulkUpdate: (ids: number[], data: any) => api.put('/users/bulk', { ids, data }),
-  create: (data: any) => api.post('/users', data),
-  delete: (id: number) => api.delete(`/users/${id}`),
-  toggleBlock: (id: number, blocked: boolean) => api.patch(`/users/${id}/block`, { blocked }),
+  update: (id: number, data: any) => api.put(`/users/${id}/`, data),
+  bulkUpdate: (ids: number[], data: any) => api.put('/users/bulk/', { ids, data }),
+  create: (data: any) => api.post('/users/', data),
+  delete: (id: number) => api.delete(`/users/${id}/`),
+  toggleBlock: (id: number, blocked: boolean) => api.patch(`/users/${id}/block/`, { blocked }),
 };
 
 // Restaurants API endpoints
 export const restaurantsAPI = {
   getAll: (params?: any) => api.get('/restaurants', params),
   getById: (id: number) => api.get(`/restaurants/${id}`),
-  update: (id: number, data: any) => api.put(`/restaurants/${id}`, data),
-  create: (data: any) => api.post('/restaurants', data),
-  delete: (id: number) => api.delete(`/restaurants/${id}`),
-  verify: (id: number, verified: boolean) => api.patch(`/restaurants/${id}/verify`, { verified }),
+  update: (id: number, data: any) => api.put(`/restaurants/${id}/`, data),
+  create: (data: any) => api.post('/restaurants/', data),
+  delete: (id: number) => api.delete(`/restaurants/${id}/`),
+  verify: (id: number, verified: boolean) => api.patch(`/restaurants/${id}/verify/`, { verified }),
 };
 
 // Promotions API endpoints
 export const promotionsAPI = {
   getAll: (params?: any) => api.get('/promotions', params),
   getById: (id: number) => api.get(`/promotions/${id}`),
-  create: (data: any) => api.post('/promotions', data),
-  update: (id: number, data: any) => api.put(`/promotions/${id}`, data),
-  delete: (id: number) => api.delete(`/promotions/${id}`),
-  toggleActivation: (id: number, active: boolean) => api.patch(`/promotions/${id}/activate`, { active }),
+  create: (data: any) => api.post('/promotions/', data),
+  update: (id: number, data: any) => api.put(`/promotions/${id}/`, data),
+  delete: (id: number) => api.delete(`/promotions/${id}/`),
+  toggleActivation: (id: number, active: boolean) => api.patch(`/promotions/${id}/activate/`, { active }),
 };
 
 // Analytics API endpoints
