@@ -1,10 +1,6 @@
-
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
-
-// Define isProduction variable
-const isProduction = process.env.NODE_ENV === 'production';
 
 export default defineConfig({
   plugins: [react()],
@@ -13,10 +9,15 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-   server: !isProduction ? {
-    allowedHosts: ['dev.proxy.example.com'], // добавьте сюда ваш хост
-    host: '0.0.0.0',
-    port: 5173,
+  server: {
+    host: '0.0.0.0', // разрешает соединения с любых хостов
+    allowedHosts: [
+      'dev.proxy.example.com',
+      'localhost',
+      '127.0.0.1',
+      '0.0.0.0'
+    ], // список разрешенных хостов
+    port: 5174,
     hmr: { overlay: true },
     proxy: {
       '/api': {
@@ -26,6 +27,5 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api/, '/api/v1'),
       },
     },
-  } : undefined,
-
+  },
 })
