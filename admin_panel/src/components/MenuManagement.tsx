@@ -41,7 +41,7 @@ import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { menuAPI } from '../services/api';
+import { menuAPI, restaurantsAPI } from '../services/api';
 
 interface Category {
   id: number;
@@ -66,14 +66,16 @@ interface Product {
 const MenuManagement = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [restaurants, setRestaurants] = useState<{id: number, name: string}[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [categoriesRes, productsRes] = await Promise.allSettled([
+        const [categoriesRes, productsRes, restaurantsRes] = await Promise.allSettled([
           menuAPI.getCategories(),
-          menuAPI.getProducts()
+          menuAPI.getProducts(),
+          restaurantsAPI.getAll() // Получаем список ресторанов
         ]);
 
         if (categoriesRes.status === 'fulfilled') {
@@ -89,6 +91,13 @@ const MenuManagement = () => {
           const productsArray = data.results || data;
           console.log('Products data:', productsArray); // Для отладки
           setProducts(productsArray);
+        }
+
+        if (restaurantsRes.status === 'fulfilled') {
+          const data = restaurantsRes.value.data;
+          const restaurantsArray = data.results || data;
+          console.log('Restaurants data:', restaurantsArray); // Для отладки
+          setRestaurants(restaurantsArray);
         }
 
         setLoading(false);
@@ -231,15 +240,22 @@ const MenuManagement = () => {
       // Get form values from dialog inputs
       const categoryName = (document.querySelector('#category-name') as HTMLInputElement)?.value;
       const parentId = (document.querySelector('#category-parent') as HTMLSelectElement)?.value;
+      const restaurantId = (document.querySelector('#category-restaurant') as HTMLSelectElement)?.value;
 
       if (!categoryName) {
         alert('Пожалуйста, заполните название категории');
         return;
       }
 
+      if (!restaurantId) {
+        alert('Пожалуйста, выберите ресторан');
+        return;
+      }
+
       const categoryData = {
         name: categoryName,
-        parent: parentId ? parseInt(parentId) : null
+        parent: parentId ? parseInt(parentId) : null,
+        restaurant: parseInt(restaurantId)
       };
 
       await menuAPI.createCategory(categoryData);
@@ -424,6 +440,16 @@ const MenuManagement = () => {
               variant="outlined"
               sx={{ mb: 2 }}
             />
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Ресторан</InputLabel>
+              <Select
+                id="category-restaurant"
+                label="Ресторан">
+                {restaurants.map(restaurant => (
+                  <MenuItem key={restaurant.id} value={restaurant.id}>{restaurant.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             <FormControl fullWidth sx={{ mb: 2 }}>
               <InputLabel>Родительская категория</InputLabel>
               <Select

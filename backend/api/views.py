@@ -1,3 +1,4 @@
+
 from rest_framework import viewsets, generics, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -285,6 +286,24 @@ class CategoryViewSet(viewsets.ModelViewSet):
             # Admin endpoints require authentication
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
+
+    def perform_create(self, serializer):
+        """
+        Автоматически устанавливаем ресторан для администраторов, если не указан
+        """
+        restaurant = serializer.validated_data.get('restaurant')
+        if not restaurant and self.request.user.is_staff:
+            # Если ресторан не указан, но пользователь - администратор,
+            # используем первый доступный ресторан
+            restaurant = Restaurant.objects.first()
+            if restaurant:
+                serializer.save(restaurant=restaurant)
+            else:
+                # Если ресторанов нет, выбрасываем исключение
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({'restaurant': 'No restaurants available'})
+        else:
+            serializer.save()
 
     @action(detail=True, methods=['get'])
     def products(self, request, pk=None):

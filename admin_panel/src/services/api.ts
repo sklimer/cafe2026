@@ -11,13 +11,43 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
+// Function to get CSRF token
+const getCsrfToken = async (): Promise<string> => {
+  try {
+    // Use a separate axios instance to get CSRF token since it might have different base URL requirements
+    const csrfAxios = axios.create({
+      baseURL: env.REACT_APP_API_URL || '/api/',
+      withCredentials: true
+    });
+    const response = await csrfAxios.get('auth/csrf/');
+    return response.data.csrfToken;
+  } catch (error) {
+    console.error('Error getting CSRF token:', error);
+    // Return empty string if CSRF token is not available
+    return '';
+  }
+};
+
+// Store CSRF token
+let csrfToken: string | null = null;
+
+// Add request interceptor to include credentials and CSRF token (for session authentication)
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('admin_token'); // Get token from local storage
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  async (config) => {
+    // Include credentials (cookies) for session authentication
+    config.withCredentials = true;
+
+    // Add CSRF token to headers for mutating requests
+    if (['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase() || '')) {
+      if (!csrfToken) {
+        csrfToken = await getCsrfToken();
+      }
+
+      if (csrfToken) {
+        config.headers['X-CSRFToken'] = csrfToken;
+      }
     }
+
     return config;
   },
   (error) => {
@@ -29,9 +59,8 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Handle unauthorized access
-      localStorage.removeItem('admin_token');
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      // Handle unauthorized access - redirect to login
       window.location.href = '/login';
     }
     return Promise.reject(error);

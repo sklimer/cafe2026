@@ -132,10 +132,12 @@ class ProductSerializer(serializers.ModelSerializer):
 
 
 class CategorySerializer(serializers.ModelSerializer):
+    restaurant = serializers.PrimaryKeyRelatedField(queryset=Restaurant.objects.all(), required=False)
+
     class Meta:
         model = Category
         fields = ['id', 'name', 'description', 'image_url', 'icon_url',
-                 'display_order', 'is_active', 'is_visible', 'created_at', 'updated_at']
+                 'display_order', 'is_active', 'is_visible', 'restaurant', 'created_at', 'updated_at']
 
 
 class CartItemSerializer(serializers.ModelSerializer):

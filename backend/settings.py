@@ -1,3 +1,4 @@
+
 """
 Django settings for telegram_mini_app project.
 """
@@ -180,9 +181,28 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = False  # Убедитесь, что это False для безопасности
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://dev.proxy.example.com",
+    "http://localhost:8000",  # Добавляем сервер Django
+]
 
 
-# JWT settings
+# CSRF settings for API
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+]
+
+# Разрешаем передачу CSRF токена через заголовок X-CSRFToken
+CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
