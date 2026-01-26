@@ -1,57 +1,10 @@
+
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCartStore } from '../stores/cartStore';
 import { Product, SelectedOption } from '../types';
-
-// Mock data - в реальной реализации будет получен через API
-const mockProduct: Product = {
-  id: 'prod1',
-  name: 'Пицца Маргарита',
-  description: 'Итальянская классика с томатами и моцареллой',
-  price: 450,
-  image: '',
-  weight: 500,
-  calories: 850,
-  proteins: 35,
-  fats: 25,
-  carbs: 95,
-  categoryId: 'cat1',
-  restaurantId: 'rest1',
-  tags: [
-    { id: 'tag1', name: 'Хит', color: '#FFD700', icon: '⭐', isActive: true },
-    { id: 'tag2', name: 'Вегетарианская', color: '#32CD32', icon: '🍅', isActive: true }
-  ],
-  options: [
-    {
-      id: 'size',
-      name: 'Размер',
-      type: 'single',
-      required: true,
-      values: [
-        { id: 'size_small', name: '25см', priceDelta: 0, isDefault: true },
-        { id: 'size_medium', name: '30см', priceDelta: 100 },
-        { id: 'size_large', name: '35см', priceDelta: 200 }
-      ]
-    },
-    {
-      id: 'extra',
-      name: 'Дополнительно (до 3)',
-      type: 'multiple',
-      required: false,
-      maxChoices: 3,
-      values: [
-        { id: 'cheese', name: 'Сырный бортик', priceDelta: 150 },
-        { id: 'sauce', name: 'Острый соус', priceDelta: 50 },
-        { id: 'oregano', name: 'Орегано', priceDelta: 30 },
-        { id: 'pepperoni', name: 'Пепперони', priceDelta: 70 }
-      ]
-    }
-  ],
-  isPopular: true,
-  isNew: false,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-};
+import { apiClient } from '../api/client';
+import { useQuery } from '@tanstack/react-query';
 
 const ProductPage: React.FC = () => {
   const { productId } = useParams<{ productId: string }>();
@@ -61,10 +14,23 @@ const ProductPage: React.FC = () => {
   const [selectedOptions, setSelectedOptions] = useState<SelectedOption[]>([]);
   const [maxChoicesWarning, setMaxChoicesWarning] = useState<string | null>(null);
 
+  // Загружаем данные продукта из API
+  const {
+    data: productData,
+    isLoading,
+    error
+  } = useQuery({
+    queryKey: ['product', productId],
+    queryFn: () => apiClient.getProduct(productId!).then(res => res.data),
+    enabled: !!productId
+  });
+
+  const product = productData?.product;
+
   // Вычисляем итоговую цену с учетом опций
-  let totalPrice = mockProduct.price;
+  let totalPrice = product?.price || 0;
   selectedOptions.forEach(option => {
-    const optionDef = mockProduct.options.find(opt => opt.id === option.optionId);
+    const optionDef = product?.options.find(opt => opt.id === option.optionId);
     if (optionDef) {
       const value = optionDef.values.find(val => val.id === option.valueId);
       if (value) {
@@ -77,7 +43,7 @@ const ProductPage: React.FC = () => {
   // Обработка выбора опции
   const handleOptionChange = (optionId: string, valueId: string, type: 'single' | 'multiple') => {
     setMaxChoicesWarning(null);
-    
+
     if (type === 'single') {
       // Для одиночного выбора заменяем значение
       setSelectedOptions(prev => [
@@ -86,7 +52,7 @@ const ProductPage: React.FC = () => {
       ]);
     } else {
       // Для множественного выбора добавляем/удаляем
-      const optionDef = mockProduct.options.find(opt => opt.id === optionId);
+      const optionDef = product?.options.find(opt => opt.id === optionId);
       if (!optionDef || !optionDef.maxChoices) return;
 
       const currentSelections = selectedOptions.filter(opt => opt.optionId === optionId);
@@ -119,15 +85,35 @@ const ProductPage: React.FC = () => {
 
   // Добавление в корзину
   const handleAddToCart = () => {
-    addItem(mockProduct, quantity, selectedOptions);
-    navigate(-1); // Возвращаемся назад
+    if (product) {
+      addItem(product, quantity, selectedOptions);
+      navigate(-1); // Возвращаемся назад
+    }
   };
+
+  // Показываем индикатор загрузки если данные еще не загружены
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  // Показываем ошибку если произошла ошибка загрузки
+  if (error || !product) {
+    return (
+      <div className="flex justify-center items-center h-64 text-red-500">
+        Ошибка загрузки данных: {(error as Error)?.message || 'Товар не найден'}
+      </div>
+    );
+  }
 
   return (
     <div className="pb-20">
       {/* Шапка */}
       <div className="sticky top-0 z-10 bg-white shadow-sm p-4 flex items-center justify-between">
-        <button 
+        <button
           className="text-gray-500 mr-2"
           onClick={() => navigate(-1)}
         >
@@ -148,28 +134,28 @@ const ProductPage: React.FC = () => {
       <div className="p-4">
         {/* Название и описание */}
         <div className="mb-4">
-          <h1 className="text-xl font-bold text-gray-900">{mockProduct.name}</h1>
-          <p className="text-gray-600 mt-1">{mockProduct.description}</p>
+          <h1 className="text-xl font-bold text-gray-900">{product.name}</h1>
+          <p className="text-gray-600 mt-1">{product.description}</p>
         </div>
 
         {/* Характеристики */}
         <div className="bg-gray-50 p-4 rounded-lg mb-4">
           <h2 className="font-medium mb-2">Характеристики:</h2>
           <div className="text-sm text-gray-600 space-y-1">
-            <div>• Вес: {mockProduct.weight}г</div>
-            {mockProduct.calories && <div>• Калории: {mockProduct.calories} ккал</div>}
-            {mockProduct.proteins && mockProduct.fats && mockProduct.carbs && (
-              <div>• Белки: {mockProduct.proteins}г / Жиры: {mockProduct.fats}г / Угл: {mockProduct.carbs}г</div>
+            <div>• Вес: {product.weight}г</div>
+            {product.calories && <div>• Калории: {product.calories} ккал</div>}
+            {product.proteins && product.fats && product.carbs && (
+              <div>• Белки: {product.proteins}г / Жиры: {product.fats}г / Угл: {product.carbs}г</div>
             )}
           </div>
         </div>
 
         {/* Теги */}
-        {mockProduct.tags.length > 0 && (
+        {product.tags.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-4">
-            {mockProduct.tags.map(tag => (
-              <span 
-                key={tag.id} 
+            {product.tags.map(tag => (
+              <span
+                key={tag.id}
                 className="inline-flex items-center bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded"
               >
                 {tag.icon} {tag.name}
@@ -180,18 +166,18 @@ const ProductPage: React.FC = () => {
 
         {/* Опции */}
         <div className="space-y-4 mb-4">
-          {mockProduct.options.map(option => (
+          {product.options.map(option => (
             <div key={option.id}>
               <h3 className="font-medium mb-2">{option.name}{option.required && '*'}</h3>
-              
+
               {option.type === 'single' ? (
                 <div className="space-y-2">
                   {option.values.map(value => (
-                    <label 
+                    <label
                       key={value.id}
                       className={`flex items-center p-3 rounded-lg border ${
-                        isOptionSelected(option.id, value.id) 
-                          ? 'border-blue-500 bg-blue-50' 
+                        isOptionSelected(option.id, value.id)
+                          ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200'
                       }`}
                     >
@@ -213,11 +199,11 @@ const ProductPage: React.FC = () => {
                     Можно выбрать до {option.maxChoices}
                   </div>
                   {option.values.map(value => (
-                    <label 
+                    <label
                       key={value.id}
                       className={`flex items-center p-3 rounded-lg border ${
-                        isOptionSelected(option.id, value.id) 
-                          ? 'border-blue-500 bg-blue-50' 
+                        isOptionSelected(option.id, value.id)
+                          ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200'
                       }`}
                     >
@@ -241,7 +227,7 @@ const ProductPage: React.FC = () => {
         <div className="flex items-center justify-between mb-4">
           <span className="font-medium">Количество:</span>
           <div className="flex items-center border rounded-lg">
-            <button 
+            <button
               className="w-10 h-10 flex items-center justify-center"
               onClick={() => setQuantity(q => Math.max(1, q - 1))}
             >
@@ -250,7 +236,7 @@ const ProductPage: React.FC = () => {
             <span className="w-10 h-10 flex items-center justify-center border-l border-r">
               {quantity}
             </span>
-            <button 
+            <button
               className="w-10 h-10 flex items-center justify-center"
               onClick={() => setQuantity(q => q + 1)}
             >

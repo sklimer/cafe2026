@@ -1,20 +1,39 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import { apiClient } from '../api/client';
+import { useQuery } from '@tanstack/react-query';
 
 const ProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const { user, bonusBalance, hasPhone, logout } = useAuthStore();
 
-  // Моковые данные для примера
-  const mockOrdersCount = 12;
-  const mockAddressesCount = 3;
+  // Загружаем количество заказов и адресов из API
+  const {
+    data: ordersData
+  } = useQuery({
+    queryKey: ['orders'],
+    queryFn: () => apiClient.getOrders().then(res => res.data),
+    staleTime: 5 * 60 * 1000, // 5 минут
+  });
+
+  const {
+    data: addressesData
+  } = useQuery({
+    queryKey: ['addresses'],
+    queryFn: () => apiClient.getAddresses().then(res => res.data),
+    staleTime: 5 * 60 * 1000, // 5 минут
+  });
+
+  const ordersCount = ordersData?.orders?.length || 0;
+  const addressesCount = addressesData?.addresses?.length || 0;
 
   return (
     <div className="pb-20">
       {/* Шапка */}
       <div className="sticky top-0 z-10 bg-white shadow-sm p-4 flex items-center justify-between">
-        <button 
+        <button
           className="text-gray-500 mr-2"
           onClick={() => navigate(-1)}
         >
@@ -67,7 +86,7 @@ const ProfilePage: React.FC = () => {
         {/* Настройки уведомлений */}
         <div className="bg-white rounded-xl shadow-sm p-4 mb-4">
           <h3 className="font-medium mb-3">Рассылки</h3>
-          
+
           <div className="space-y-3">
             <label className="flex items-center">
               <input type="checkbox" defaultChecked className="mr-3" />
@@ -97,7 +116,7 @@ const ProfilePage: React.FC = () => {
 
         {/* Дополнительные разделы */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-4">
-          <button 
+          <button
             className="w-full flex items-center justify-between p-4 border-b"
             onClick={() => navigate('/orders')}
           >
@@ -105,10 +124,10 @@ const ProfilePage: React.FC = () => {
               <span className="mr-3">📋</span>
               <span>Мои заказы</span>
             </span>
-            <span className="text-gray-500 text-sm">{mockOrdersCount}</span>
+            <span className="text-gray-500 text-sm">{ordersCount}</span>
           </button>
-          
-          <button 
+
+          <button
             className="w-full flex items-center justify-between p-4"
             onClick={() => navigate('/addresses')}
           >
@@ -116,7 +135,7 @@ const ProfilePage: React.FC = () => {
               <span className="mr-3">🏠</span>
               <span>Мои адреса</span>
             </span>
-            <span className="text-gray-500 text-sm">{mockAddressesCount}</span>
+            <span className="text-gray-500 text-sm">{addressesCount}</span>
           </button>
         </div>
 

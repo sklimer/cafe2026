@@ -1,91 +1,60 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCartStore } from '../stores/cartStore';
 import { Product, Category } from '../types';
-
-// Mock data - в реальной реализации будет получен через API
-const mockProducts: Product[] = [
-  {
-    id: 'prod1',
-    name: 'Пицца Маргарита',
-    description: 'Итальянская классика с томатами и моцареллой',
-    price: 450,
-    image: '',
-    weight: 500,
-    calories: 850,
-    proteins: 35,
-    fats: 25,
-    carbs: 95,
-    categoryId: 'cat1',
-    restaurantId: 'rest1',
-    tags: [],
-    options: [],
-    isPopular: true,
-    isNew: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'prod2',
-    name: 'Бургер классический',
-    description: 'Мясная котлета, свежие овощи, соус',
-    price: 350,
-    image: '',
-    weight: 300,
-    calories: 750,
-    proteins: 40,
-    fats: 30,
-    carbs: 80,
-    categoryId: 'cat2',
-    restaurantId: 'rest1',
-    tags: [],
-    options: [],
-    isPopular: false,
-    isNew: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'prod3',
-    name: 'Картофель фри',
-    description: 'Хрустящий картофель из свежего картофеля',
-    price: 150,
-    image: '',
-    weight: 200,
-    calories: 550,
-    proteins: 5,
-    fats: 25,
-    carbs: 75,
-    categoryId: 'cat3',
-    restaurantId: 'rest1',
-    tags: [],
-    options: [],
-    isPopular: true,
-    isNew: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
-
-const mockCategories: Category[] = [
-  { id: 'cat1', name: 'Пицца', restaurantId: 'rest1', sortOrder: 1, isActive: true },
-  { id: 'cat2', name: 'Бургеры', restaurantId: 'rest1', sortOrder: 2, isActive: true },
-  { id: 'cat3', name: 'Закуски', restaurantId: 'rest1', sortOrder: 3, isActive: true },
-  { id: 'cat4', name: 'Напитки', restaurantId: 'rest1', sortOrder: 4, isActive: true },
-];
+import { apiClient } from '../api/client';
+import { useQuery } from '@tanstack/react-query';
 
 const MenuPage: React.FC = () => {
   const { restaurantId } = useParams<{ restaurantId: string }>();
   const { addItem, totalItems, subtotal } = useCartStore();
-  const [activeCategory, setActiveCategory] = useState<string>('cat1');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const categoriesRef = useRef<HTMLDivElement>(null);
-  
+
+  // Загружаем меню ресторана (категории и продукты) из API
+  const {
+    data: menuData,
+    isLoading: menuLoading,
+    error: menuError
+  } = useQuery({
+    queryKey: ['menu', restaurantId],
+    queryFn: () => apiClient.getCategories(restaurantId!).then(res => res.data),
+    enabled: !!restaurantId
+  });
+
+  // Извлекаем категории и продукты из ответа
+  const categories = menuData?.categories || [];
+  const products = menuData?.products || [];
+
+  // Устанавливаем первую категорию как активную при загрузке
+  const [activeCategory, setActiveCategory] = useState<string>(() => {
+    return categories.length > 0 ? categories[0].id : '';
+  });
+
   // Фильтруем продукты по активной категории
-  const productsByCategory = mockProducts.filter(
+  const productsByCategory = products.filter(
     product => product.categoryId === activeCategory
   );
+
+  // Показываем индикатор загрузки если данные еще не загружены
+  if (menuLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  // Показываем ошибку если произошла ошибка загрузки
+  if (menuError) {
+    return (
+      <div className="flex justify-center items-center h-64 text-red-500">
+        Ошибка загрузки данных: {(menuError as Error)?.message || 'Не удалось загрузить меню'}
+      </div>
+    );
+  }
 
   // Функция для добавления товара в корзину
   const handleAddToCart = (product: Product) => {
@@ -109,7 +78,9 @@ const MenuPage: React.FC = () => {
         <button className="text-gray-500 mr-2">
           ←
         </button>
-        <h1 className="text-lg font-bold truncate flex-1 text-center">Ресторан "Пример"</h1>
+        <h1 className="text-lg font-bold truncate flex-1 text-center">
+          {menuData?.restaurant?.name || 'Загрузка...'}
+        </h1>
         <div className="relative ml-2">
           <button className="text-xl">
             🛒
@@ -125,7 +96,7 @@ const MenuPage: React.FC = () => {
       {/* Навигация по категориям */}
       <div className="bg-white p-3 sticky top-[68px] z-10 overflow-x-auto hide-scrollbar">
         <div ref={categoriesRef} className="flex space-x-4 min-w-max">
-          {mockCategories.map(category => (
+          {categories.map(category => (
             <button
               key={category.id}
               className={`px-4 py-2 rounded-full whitespace-nowrap ${
@@ -189,7 +160,7 @@ const MenuPage: React.FC = () => {
                         ⭐ Хит
                       </span>
                     )}
-                    
+
                     <button
                       className="bg-blue-500 hover:bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center"
                       onClick={(e) => {
@@ -225,7 +196,7 @@ const MenuPage: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end z-50">
           <div className="bg-white w-full rounded-t-xl p-4 max-h-[80vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <button 
+              <button
                 onClick={() => setSelectedProduct(null)}
                 className="text-gray-500"
               >
@@ -234,10 +205,10 @@ const MenuPage: React.FC = () => {
               <h2 className="text-lg font-bold flex-1 text-center">{selectedProduct.name}</h2>
               <div className="w-8"></div> {/* Для выравнивания */}
             </div>
-            
+
             <div className="mb-6">
               <p className="text-gray-600">{selectedProduct.description}</p>
-              
+
               <div className="mt-4">
                 <h3 className="font-medium mb-2">Характеристики:</h3>
                 <div className="text-sm text-gray-600">
@@ -248,7 +219,7 @@ const MenuPage: React.FC = () => {
                   )}
                 </div>
               </div>
-              
+
               <div className="mt-4">
                 {selectedProduct.tags.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-4">
@@ -259,7 +230,7 @@ const MenuPage: React.FC = () => {
                     ))}
                   </div>
                 )}
-                
+
                 <button
                   className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-xl font-medium"
                   onClick={() => {
