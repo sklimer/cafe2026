@@ -44,10 +44,7 @@ class Category(models.Model):
     def save(self, *args, **kwargs):
         # Update updated_at timestamp
         self.updated_at = timezone.now()
-        # Use transaction to prevent race conditions
-        from django.db import transaction
-        with transaction.atomic():
-            super().save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
     @property
     def has_children(self):
@@ -86,10 +83,7 @@ class Tag(models.Model):
     def save(self, *args, **kwargs):
         # Update updated_at timestamp
         self.updated_at = timezone.now()
-        # Use transaction to prevent race conditions
-        from django.db import transaction
-        with transaction.atomic():
-            super().save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
 
 class Product(models.Model):
@@ -170,10 +164,7 @@ class Product(models.Model):
     def save(self, *args, **kwargs):
         # Update updated_at timestamp
         self.updated_at = timezone.now()
-        # Use transaction to prevent race conditions
-        from django.db import transaction
-        with transaction.atomic():
-            super().save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
     @property
     def in_stock(self):
@@ -245,10 +236,7 @@ class ProductOption(models.Model):
     def save(self, *args, **kwargs):
         # Update updated_at timestamp
         self.updated_at = timezone.now()
-        # Use transaction to prevent race conditions
-        from django.db import transaction
-        with transaction.atomic():
-            super().save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
 
 class OptionValue(models.Model):
@@ -291,10 +279,7 @@ class OptionValue(models.Model):
     def save(self, *args, **kwargs):
         # Update updated_at timestamp
         self.updated_at = timezone.now()
-        # Use transaction to prevent race conditions
-        from django.db import transaction
-        with transaction.atomic():
-            super().save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
 
 class ProductOptionMapping(models.Model):
