@@ -345,8 +345,3 @@ class ApiClient {
 
 export const apiClient = new ApiClient();
 
-// Для удобства отладки, добавляем глобальный доступ к логам в development режиме
-if (process.env.NODE_ENV === 'development') {
-  (window as any).apiLogs = apiClient.getLogs.bind(apiClient);
-}
-}
