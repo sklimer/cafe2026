@@ -136,6 +136,22 @@ class OptionValueSerializer(serializers.ModelSerializer):
         ]
 
 
+class ProductCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Product
+        fields = [
+            'id', 'name', 'description', 'short_description', 'price',
+            'old_price', 'cost_price', 'category', 'restaurant',
+            'weight_grams', 'volume_ml', 'calories', 'proteins', 'fats', 'carbohydrates',
+            'main_image_url', 'image_urls', 'video_url', 'is_available',
+            'stock_quantity', 'is_unlimited_stock', 'low_stock_threshold',
+            'is_popular', 'is_new', 'is_recommended', 'is_spicy', 'is_vegetarian',
+            'is_vegan', 'is_gluten_free', 'cooking_time_minutes', 'preparation_instructions',
+            'display_order', 'seo_title', 'seo_description', 'seo_keywords',
+            'custom_attributes'
+        ]
+
+
 class ProductSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', allow_null=True)
     restaurant_name = serializers.CharField(source='restaurant.name')
@@ -151,7 +167,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'restaurant_name', 'weight_grams', 'calories', 'main_image_url',
             'image_urls', 'is_popular', 'is_new', 'is_recommended',
             'is_vegetarian', 'is_vegan', 'is_gluten_free', 'tags',
-            'options', 'in_stock', 'cooking_time_minutes'
+            'options', 'in_stock', 'cooking_time_minutes', 'stock_quantity'
         ]
 
     def get_options(self, obj):

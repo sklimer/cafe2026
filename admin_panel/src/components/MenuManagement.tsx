@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -50,12 +51,14 @@ interface Product {
   id: number;
   name: string;
   category: string;
+  restaurant: number;
   price: number;
   costPrice: number;
   isAvailable: boolean;
   stockQuantity: number;
   orderCount: number;
   tags: string[];
+  description: string;
 }
 
 const MenuManagement = () => {
@@ -76,11 +79,13 @@ const MenuManagement = () => {
   const [productForm, setProductForm] = useState({
     name: '',
     category: '',
+    restaurant: '',
     price: '',
     costPrice: '',
     isAvailable: false,
     stockQuantity: '',
     tags: '',
+    description: '',
   });
 
   useEffect(() => {
@@ -397,9 +402,21 @@ const MenuManagement = () => {
         return;
       }
 
+      if (!productForm.restaurant) {
+        alert('Пожалуйста, выберите ресторан');
+        return;
+      }
+
+      if (!productForm.description) {
+        alert('Пожалуйста, заполните описание товара');
+        return;
+      }
+
       const productData = {
         name: productForm.name,
+        restaurant: parseInt(productForm.restaurant),
         category: productForm.category ? parseInt(productForm.category) : null,
+        description: productForm.description,
         price: parseFloat(productForm.price) || 0,
         cost_price: parseFloat(productForm.costPrice) || 0,
         is_available: productForm.isAvailable,
@@ -440,11 +457,13 @@ const MenuManagement = () => {
       setProductForm({
         name: '',
         category: '',
+        restaurant: '',
         price: '',
         costPrice: '',
         isAvailable: false,
         stockQuantity: '',
         tags: '',
+        description: '',
       });
 
       console.log('Product created successfully');
@@ -613,6 +632,21 @@ const MenuManagement = () => {
               required
             />
             <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Ресторан *</InputLabel>
+              <Select
+                name="restaurant"
+                label="Ресторан *"
+                value={productForm.restaurant}
+                onChange={handleProductFormChange}
+                required
+              >
+                <MenuItem value="">Выберите ресторан</MenuItem>
+                {restaurants.map(restaurant => (
+                  <MenuItem key={restaurant.id} value={restaurant.id}>{restaurant.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth sx={{ mb: 2 }}>
               <InputLabel>Категория</InputLabel>
               <Select
                 name="category"
@@ -626,6 +660,19 @@ const MenuManagement = () => {
                 ))}
               </Select>
             </FormControl>
+            <TextField
+              name="description"
+              margin="dense"
+              label="Описание *"
+              fullWidth
+              variant="outlined"
+              multiline
+              rows={3}
+              value={productForm.description}
+              onChange={handleProductFormChange}
+              sx={{ mb: 2 }}
+              required
+            />
             <TextField
               name="price"
               margin="dense"

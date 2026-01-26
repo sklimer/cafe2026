@@ -1,4 +1,3 @@
-
 from rest_framework import viewsets, generics, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -29,7 +28,8 @@ from .serializers import (
     UserSerializer, UserAddressSerializer, RestaurantSerializer,
     RestaurantBranchSerializer, CategorySerializer, ProductSerializer,
     TagSerializer, OrderSerializer, CartSerializer, PromoCodeSerializer,
-    BonusRuleSerializer, UserBonusTransactionSerializer, AdminRestaurantSerializer
+    BonusRuleSerializer, UserBonusTransactionSerializer, AdminRestaurantSerializer,
+    ProductCreateUpdateSerializer
 )
 
 
@@ -331,6 +331,14 @@ class ProductViewSet(viewsets.ModelViewSet):
     filterset_fields = ['restaurant', 'category', 'is_available', 'is_popular', 'is_new',
                         'is_recommended', 'is_vegetarian', 'is_vegan', 'is_gluten_free']
     ordering_fields = ['display_order', 'price', 'created_at', 'popularity']
+
+    def get_serializer_class(self):
+        """
+        Use different serializers for different actions
+        """
+        if self.action in ['create', 'update', 'partial_update']:
+            return ProductCreateUpdateSerializer
+        return ProductSerializer
 
     def get_permissions(self):
         """
