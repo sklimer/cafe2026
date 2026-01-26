@@ -36,10 +36,10 @@ export const useCartStore = create<CartState>((set, get) => ({
           product,
           quantity,
           selectedOptions: options,
-          price: calculateItemPrice(product, options)
+          price: Number(calculateItemPrice(product, options))
         }],
         restaurantId: product.restaurantId,
-        subtotal: calculateItemPrice(product, options) * quantity
+        subtotal: Number(calculateItemPrice(product, options)) * quantity
       };
     }
 
@@ -65,7 +65,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         product,
         quantity,
         selectedOptions: options,
-        price: calculateItemPrice(product, options)
+        price: Number(calculateItemPrice(product, options))
       });
     }
 
@@ -125,14 +125,14 @@ export const useCartStore = create<CartState>((set, get) => ({
 
 // Вспомогательная функция для расчета цены с учетом опций
 function calculateItemPrice(product: Product, options: SelectedOption[]): number {
-  let price = product.price;
+  let price = Number(product.price);
 
   for (const option of options) {
     const optionDef = product.options.find(opt => opt.id === option.optionId);
     if (optionDef) {
       const value = optionDef.values.find(val => val.id === option.valueId);
       if (value) {
-        price += value.priceDelta;
+        price += Number(value.priceDelta);
       }
     }
   }

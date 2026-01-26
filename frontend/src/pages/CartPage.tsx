@@ -5,7 +5,8 @@ import { useCartStore } from '../stores/cartStore';
 
 const CartPage: React.FC = () => {
   const navigate = useNavigate();
-  const { items, totalItems, subtotal, clearCart, removeItem, updateQuantity } = useCartStore();
+  const { items, subtotal, clearCart, removeItem, updateQuantity } = useCartStore();
+  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleCheckout = () => {
     if (items.length > 0) {
@@ -74,7 +75,7 @@ const CartPage: React.FC = () => {
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="font-medium text-gray-800">{item.product.name}</h3>
-                  <p className="text-gray-600 text-sm mt-1">{item.price.toFixed(2)} ₽ × {item.quantity}</p>
+                  <p className="text-gray-600 text-sm mt-1">{Number(item.price).toFixed(2)} ₽ × {item.quantity}</p>
                 </div>
                 <div className="flex items-center space-x-3">
                   <button
@@ -98,7 +99,7 @@ const CartPage: React.FC = () => {
                   </button>
                 </div>
               </div>
-              <p className="mt-2 font-semibold text-gray-800">{(item.price * item.quantity).toFixed(2)} ₽</p>
+              <p className="mt-2 font-semibold text-gray-800">{(Number(item.price) * item.quantity).toFixed(2)} ₽</p>
             </div>
           ))}
         </div>
@@ -109,7 +110,7 @@ const CartPage: React.FC = () => {
         <div className="max-w-md mx-auto">
           <div className="flex justify-between items-center mb-3">
             <span className="text-gray-600">Товаров: {totalItems}</span>
-            <span className="text-lg font-semibold">{subtotal.toFixed(2)} ₽</span>
+            <span className="text-lg font-semibold">{Number(subtotal).toFixed(2)} ₽</span>
           </div>
 
           <div className="flex space-x-3">

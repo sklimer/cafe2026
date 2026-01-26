@@ -1,6 +1,11 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
 
+
+
+
+
+
 const Layout: React.FC = () => {
   const [isInTelegram, setIsInTelegram] = React.useState(false);
   const [webApp, setWebApp] = React.useState<any>(null);
