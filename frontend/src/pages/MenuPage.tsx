@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -42,14 +43,6 @@ const MenuPage: React.FC = () => {
     queryFn: async () => {
       console.log('📱 Запрос меню для ресторана:', restaurantId);
 
-      // Проверка доступности API
-      try {
-        const testResponse = await fetch('/api/');
-        console.log('🌐 Тест API доступен:', testResponse.ok);
-      } catch (error) {
-        console.error('❌ API недоступен:', error);
-      }
-
       const response = await apiClient.getCategories(restaurantId!);
       console.log('📱 Полный ответ API getCategories:', response);
 
@@ -89,16 +82,36 @@ const MenuPage: React.FC = () => {
   const products = menuData?.products || [];
   const restaurant = menuData?.restaurant;
 
+  // Устанавливаем первую категорию как активную при загрузке
+  const [activeCategory, setActiveCategory] = useState<string>('');
+
+  // Обновляем активную категорию после загрузки данных
+  useEffect(() => {
+    if (categories.length > 0 && !activeCategory) {
+      setActiveCategory(categories[0].id);
+    }
+  }, [categories, activeCategory]);
+
   console.log('📊 Парсинг данных:', {
     categoriesLength: categories.length,
     productsLength: products.length,
     restaurantName: restaurant?.name
   });
 
-  // Устанавливаем первую категорию как активную при загрузке
-  const [activeCategory, setActiveCategory] = useState<string>(() => {
-    return categories.length > 0 ? categories[0].id : '';
-  });
+  // Функция для добавления товара в корзину
+  const handleAddToCart = (product: Product) => {
+    addItem(product, 1, []);
+  };
+
+  // Эффект для отслеживания скролла и изменения активной категории
+  useEffect(() => {
+    const handleScroll = () => {
+      // В реальной реализации здесь будет логика определения активной категории при скролле
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Фильтруем продукты по активной категории
   const productsByCategory = products.filter(
@@ -151,16 +164,6 @@ const MenuPage: React.FC = () => {
   const handleAddToCart = (product: Product) => {
     addItem(product, 1, []);
   };
-
-  // Эффект для отслеживания скролла и изменения активной категории
-  useEffect(() => {
-    const handleScroll = () => {
-      // В реальной реализации здесь будет логика определения активной категории при скролле
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
 
   return (
     <div className="pb-20">
