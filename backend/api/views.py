@@ -219,9 +219,27 @@ class RestaurantViewSet(viewsets.ReadOnlyModelViewSet):
         GET /api/v1/restaurants/{id}/menu/
         """
         restaurant = self.get_object()
+
+        # Get categories for the restaurant
         categories = Category.objects.filter(restaurant=restaurant, is_active=True, is_visible=True)
-        serializer = CategorySerializer(categories, many=True)
-        return Response(serializer.data)
+        categories_serializer = CategorySerializer(categories, many=True)
+
+        # Get all products for the restaurant that belong to visible/active categories
+        category_ids = categories.values_list('id', flat=True)
+        products = Product.objects.filter(
+            category_id__in=category_ids,
+            is_available=True
+        )
+        products_serializer = ProductSerializer(products, many=True)
+
+        # Prepare response data
+        response_data = {
+            'restaurant': RestaurantSerializer(restaurant).data,
+            'categories': categories_serializer.data,
+            'products': products_serializer.data
+        }
+
+        return Response(response_data)
 
 
 class RestaurantBranchViewSet(viewsets.ReadOnlyModelViewSet):
