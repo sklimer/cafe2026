@@ -13,6 +13,7 @@ import CategoryPage from './pages/CategoryPage';
 import CheckoutPage from './pages/CheckoutPage';
 import OrdersPage from './pages/OrdersPage';
 import OrderDetailsPage from './pages/OrderDetailsPage';
+import CartPage from './pages/CartPage';
 import Layout from './components/layout/Layout';
 
 const queryClient = new QueryClient({
@@ -40,6 +41,7 @@ function App() {
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/orders" element={<OrdersPage />} />
             <Route path="/order/:orderId" element={<OrderDetailsPage />} />
+            <Route path="/cart" element={<CartPage />} />
           </Route>
         </Routes>
       </Router>

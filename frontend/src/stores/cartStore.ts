@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import type { Product, CartItem, SelectedOption } from '../types/index';
 
@@ -29,11 +30,11 @@ export const useCartStore = create<CartState>((set, get) => ({
       // Если нет, очищаем корзину перед добавлением
       return {
         ...state,
-        items: [{ 
-          id: `${product.id}_${Date.now()}`, 
-          productId: product.id, 
-          product, 
-          quantity, 
+        items: [{
+          id: `${product.id}_${Date.now()}`,
+          productId: product.id,
+          product,
+          quantity,
           selectedOptions: options,
           price: calculateItemPrice(product, options)
         }],
@@ -43,9 +44,9 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
 
     // Проверяем, есть ли уже такой товар с такими же опциями
-    const existingItemIndex = state.items.findIndex(item => 
-      item.productId === product.id && 
-      JSON.stringify(item.selectedOptions.map(o => o.valueId).sort()) === 
+    const existingItemIndex = state.items.findIndex(item =>
+      item.productId === product.id &&
+      JSON.stringify(item.selectedOptions.map(o => o.valueId).sort()) ===
       JSON.stringify(options.map(o => o.valueId).sort())
     );
 
@@ -98,17 +99,17 @@ export const useCartStore = create<CartState>((set, get) => ({
 
   // Computed properties
   get totalItems() {
-    return get().items.reduce((sum, item) => sum + item.quantity, 0);
+    return this.items.reduce((sum, item) => sum + item.quantity, 0);
   },
 
   itemCount: (productId: string) => {
-    return get().items
+    return this.items
       .filter(item => item.productId === productId)
       .reduce((sum, item) => sum + item.quantity, 0);
   },
 
   isSameRestaurant: (restaurantId: string) => {
-    return get().restaurantId === restaurantId;
+    return this.restaurantId === restaurantId;
   },
 
   // Вспомогательная функция для удаления элемента
@@ -125,7 +126,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 // Вспомогательная функция для расчета цены с учетом опций
 function calculateItemPrice(product: Product, options: SelectedOption[]): number {
   let price = product.price;
-  
+
   for (const option of options) {
     const optionDef = product.options.find(opt => opt.id === option.optionId);
     if (optionDef) {
@@ -135,6 +136,6 @@ function calculateItemPrice(product: Product, options: SelectedOption[]): number
       }
     }
   }
-  
+
   return price;
 }

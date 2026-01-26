@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCartStore } from '../stores/cartStore';
 import { Product, Category } from '../types';
@@ -9,7 +9,10 @@ import { useQuery } from '@tanstack/react-query';
 
 const MenuPage: React.FC = () => {
   const { restaurantId } = useParams<{ restaurantId: string }>();
-  const { addItem, totalItems, subtotal } = useCartStore();
+  const navigate = useNavigate();
+  const addItem = useCartStore(state => state.addItem);
+  const totalItems = useCartStore(state => state.totalItems);
+  const subtotal = useCartStore(state => state.subtotal);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const categoriesRef = useRef<HTMLDivElement>(null);
 
@@ -19,6 +22,8 @@ const MenuPage: React.FC = () => {
     console.log('  restaurantId:', restaurantId);
     console.log('  window.Telegram:', window.Telegram);
     console.log('  window.Telegram?.WebApp?.initData:', window.Telegram?.WebApp?.initData);
+    console.log('  initial totalItems:', totalItems);
+    console.log('  initial subtotal:', subtotal);
 
     // Принудительный тестовый запрос
     if (restaurantId) {
@@ -32,6 +37,11 @@ const MenuPage: React.FC = () => {
         });
     }
   }, [restaurantId]);
+
+  // Отслеживаем изменения состояния корзины
+  useEffect(() => {
+    console.log('🛒 Состояние корзины обновлено:', { totalItems, subtotal });
+  }, [totalItems, subtotal]);
 
   // Загружаем меню ресторана (категории и продукты) из API
   const {
@@ -213,7 +223,7 @@ const MenuPage: React.FC = () => {
           {restaurant?.name || menuData?.restaurant?.name || 'Ресторан'}
         </h1>
         <div className="relative ml-2">
-          <button className="text-xl">
+          <button className="text-xl" onClick={() => navigate('/cart')}>
             🛒
           </button>
           {totalItems > 0 && (
@@ -329,7 +339,7 @@ const MenuPage: React.FC = () => {
             {totalItems} товар{totalItems % 10 === 1 && totalItems % 100 !== 11 ? '' : totalItems % 10 > 1 && totalItems % 10 < 5 && (totalItems % 100 < 10 || totalItems % 100 >= 20) ? 'а' : 'ов'} • {subtotal}₽
           </div>
         </div>
-        <button className="bg-blue-500 hover:bg-blue-600 text-white rounded-full px-4 py-2 flex items-center">
+        <button className="bg-blue-500 hover:bg-blue-600 text-white rounded-full px-4 py-2 flex items-center" onClick={() => navigate('/checkout')}>
           🛒 Перейти к заказу
         </button>
       </div>
