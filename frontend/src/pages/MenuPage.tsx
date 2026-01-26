@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -160,14 +159,11 @@ const MenuPage: React.FC = () => {
     );
   }
 
-  // Функция для добавления товара в корзину
-  const handleAddToCart = (product: Product) => {
-    addItem(product, 1, []);
-  };
+  // УДАЛЕНО: Второе объявление handleAddToCart - оно уже есть выше
 
   return (
     <div className="pb-20">
-      {/* Шапка с названием ресторана и корзиной */}
+
       <div className="sticky top-0 z-10 bg-white shadow-sm p-4 flex items-center justify-between">
         <button className="text-gray-500 mr-2">
           ←
