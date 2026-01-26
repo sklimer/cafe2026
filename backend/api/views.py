@@ -175,6 +175,32 @@ class RestaurantViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Restaurant.objects.filter(is_active=True)
     serializer_class = RestaurantSerializer
 
+    def get_permissions(self):
+        """
+        Instantiates and returns the list of permissions that this view requires.
+        """
+        from rest_framework.permissions import AllowAny
+        # Public endpoints for frontend
+        permission_classes = [AllowAny]
+        return [permission() for permission in permission_classes]
+
+    def get_authenticators(self):
+        """
+        Returns the authenticator classes that this view uses.
+        Allows both authenticated and unauthenticated access.
+        """
+        from .authentication import TelegramAuthentication
+        from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+
+        # Include Telegram authentication along with standard ones
+        authenticator_classes = [
+            TelegramAuthentication,
+            SessionAuthentication,
+            TokenAuthentication
+        ]
+
+        return [auth() for auth in authenticator_classes]
+
     @action(detail=True, methods=['get'])
     def branches(self, request, pk=None):
         """
@@ -204,6 +230,32 @@ class RestaurantBranchViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = RestaurantBranch.objects.filter(is_active=True)
     serializer_class = RestaurantBranchSerializer
+
+    def get_permissions(self):
+        """
+        Instantiates and returns the list of permissions that this view requires.
+        """
+        from rest_framework.permissions import AllowAny
+        # Public endpoints for frontend
+        permission_classes = [AllowAny]
+        return [permission() for permission in permission_classes]
+
+    def get_authenticators(self):
+        """
+        Returns the authenticator classes that this view uses.
+        Allows both authenticated and unauthenticated access.
+        """
+        from .authentication import TelegramAuthentication
+        from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+
+        # Include Telegram authentication along with standard ones
+        authenticator_classes = [
+            TelegramAuthentication,
+            SessionAuthentication,
+            TokenAuthentication
+        ]
+
+        return [auth() for auth in authenticator_classes]
 
     @action(detail=True, methods=['get'])
     def availability(self, request, pk=None):
@@ -283,11 +335,28 @@ class CategoryViewSet(viewsets.ModelViewSet):
         from rest_framework.permissions import IsAuthenticated, AllowAny
         if self.action in ['list', 'retrieve']:
             # Public endpoints for frontend
-            permission_classes = []
+            permission_classes = [AllowAny]
         else:
             # Admin endpoints require authentication
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
+
+    def get_authenticators(self):
+        """
+        Returns the authenticator classes that this view uses.
+        Allows both authenticated and unauthenticated access.
+        """
+        from .authentication import TelegramAuthentication
+        from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+
+        # Include Telegram authentication along with standard ones
+        authenticator_classes = [
+            TelegramAuthentication,
+            SessionAuthentication,
+            TokenAuthentication
+        ]
+
+        return [auth() for auth in authenticator_classes]
 
     def perform_create(self, serializer):
         """
@@ -349,11 +418,28 @@ class ProductViewSet(viewsets.ModelViewSet):
         from rest_framework.permissions import IsAuthenticated, AllowAny
         if self.action in ['list', 'retrieve']:
             # Public endpoints for frontend
-            permission_classes = []
+            permission_classes = [AllowAny]
         else:
             # Admin endpoints require authentication
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
+
+    def get_authenticators(self):
+        """
+        Returns the authenticator classes that this view uses.
+        Allows both authenticated and unauthenticated access.
+        """
+        from .authentication import TelegramAuthentication
+        from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+
+        # Include Telegram authentication along with standard ones
+        authenticator_classes = [
+            TelegramAuthentication,
+            SessionAuthentication,
+            TokenAuthentication
+        ]
+
+        return [auth() for auth in authenticator_classes]
 
     @action(detail=True, methods=['get'])
     def options(self, request, pk=None):
@@ -392,6 +478,32 @@ class TagViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = TagSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['restaurant']
+
+    def get_permissions(self):
+        """
+        Instantiates and returns the list of permissions that this view requires.
+        """
+        from rest_framework.permissions import AllowAny
+        # Public endpoints for frontend
+        permission_classes = [AllowAny]
+        return [permission() for permission in permission_classes]
+
+    def get_authenticators(self):
+        """
+        Returns the authenticator classes that this view uses.
+        Allows both authenticated and unauthenticated access.
+        """
+        from .authentication import TelegramAuthentication
+        from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+
+        # Include Telegram authentication along with standard ones
+        authenticator_classes = [
+            TelegramAuthentication,
+            SessionAuthentication,
+            TokenAuthentication
+        ]
+
+        return [auth() for auth in authenticator_classes]
 
 
 class OrderViewSet(viewsets.ModelViewSet):

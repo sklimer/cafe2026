@@ -14,7 +14,19 @@ const ProfilePage: React.FC = () => {
     data: ordersData
   } = useQuery({
     queryKey: ['orders'],
-    queryFn: () => apiClient.getOrders().then(res => res.data),
+    queryFn: async () => {
+      const res = await apiClient.getOrders();
+      if (res.success && res.data) {
+        // Check if response is paginated (has results field)
+        if (res.data.results !== undefined) {
+          return res.data.results;
+        } else {
+          // If not paginated, return the data directly
+          return res.data;
+        }
+      }
+      return [];
+    },
     staleTime: 5 * 60 * 1000, // 5 минут
   });
 
@@ -22,12 +34,24 @@ const ProfilePage: React.FC = () => {
     data: addressesData
   } = useQuery({
     queryKey: ['addresses'],
-    queryFn: () => apiClient.getAddresses().then(res => res.data),
+    queryFn: async () => {
+      const res = await apiClient.getAddresses();
+      if (res.success && res.data) {
+        // Check if response is paginated (has results field)
+        if (res.data.results !== undefined) {
+          return res.data.results;
+        } else {
+          // If not paginated, return the data directly
+          return res.data;
+        }
+      }
+      return [];
+    },
     staleTime: 5 * 60 * 1000, // 5 минут
   });
 
-  const ordersCount = ordersData?.orders?.length || 0;
-  const addressesCount = addressesData?.addresses?.length || 0;
+  const ordersCount = Array.isArray(ordersData) ? ordersData.length : 0;
+  const addressesCount = Array.isArray(addressesData) ? addressesData.length : 0;
 
   return (
     <div className="pb-20">

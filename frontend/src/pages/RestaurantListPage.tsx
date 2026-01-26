@@ -17,7 +17,13 @@ const RestaurantListPage: React.FC = () => {
 
         if (response.success && response.data) {
           console.log('✅ Ответ от API:', response.data);
-          setRestaurants(Array.isArray(response.data) ? response.data : []);
+          // Проверяем, является ли ответ пагинированным (содержит поле results)
+          if (response.data.results !== undefined) {
+            setRestaurants(Array.isArray(response.data.results) ? response.data.results : []);
+          } else {
+            // Если нет поля results, проверяем, является ли сам response.data массивом
+            setRestaurants(Array.isArray(response.data) ? response.data : []);
+          }
         } else {
           console.error('❌ Ошибка ответа от API:', response.error);
           setError(response.error || 'Неизвестная ошибка');

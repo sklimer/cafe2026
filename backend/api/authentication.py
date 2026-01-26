@@ -1,11 +1,16 @@
-
 import hashlib
 import hmac
 import urllib.parse
+import logging
+import json
+import time
+from typing import Optional, Tuple
 from django.conf import settings
 from rest_framework import authentication
 from rest_framework.exceptions import AuthenticationFailed
 from users.models import User
+
+logger = logging.getLogger(__name__)
 
 
 class TelegramAuthentication(authentication.BaseAuthentication):
@@ -13,95 +18,187 @@ class TelegramAuthentication(authentication.BaseAuthentication):
     Аутентификация через Telegram WebApp Init Data
     """
 
-    def authenticate(self, request):
-        # Проверяем наличие заголовка с инициализационными данными Telegram
-        init_data = request.META.get('HTTP_X_TELEGRAM_INIT_DATA')
-
+    def authenticate(self, request) -> Optional[Tuple[User, None]]:
+        init_data = self._extract_init_data(request)
         if not init_data:
-            # Если нет заголовка, пробуем получить из параметров
-            init_data = request.GET.get('init_data')
-
-        if not init_data:
+            logger.warning("Telegram init_data не найдена в запросе")
             return None
 
-        # Проверяем подпись Telegram
-        if not self.validate_telegram_init_data(init_data):
+        # Валидируем init_data
+        validation_result = self._validate_telegram_init_data(init_data)
+
+        if validation_result is False:
+            logger.error("Валидация Telegram init_data не пройдена")
             raise AuthenticationFailed('Invalid Telegram init data signature')
 
-        # Парсим данные пользователя
-        user_data = self.parse_user_data(init_data)
+        # Получаем данные пользователя
+        user_data = None
+        if isinstance(validation_result, str):
+            user_data = self._parse_user_json(validation_result)
+        elif validation_result is True:
+            user_data = self._extract_user_from_init_data(init_data)
 
         if not user_data:
-            raise AuthenticationFailed('Could not parse user data from init data')
+            logger.error("Не удалось получить данные пользователя из init_data")
+            raise AuthenticationFailed('Could not get user data from init data')
 
         # Создаем или получаем пользователя
-        user, created = self.get_or_create_user(user_data)
+        try:
+            user, created = self._get_or_create_user(user_data)
+            return user, None
 
-        return user, None
+        except Exception as e:
+            logger.exception(f"Ошибка при создании/получении пользователя")
+            raise AuthenticationFailed(f'User creation failed: {str(e)}')
 
-    def validate_telegram_init_data(self, init_data):
-        """
-        Проверяет подпись данных Telegram
-        """
+    def _extract_init_data(self, request) -> Optional[str]:
+        init_data = request.META.get('HTTP_X_TELEGRAM_INIT_DATA')
+        if not init_data:
+            init_data = request.GET.get('init_data')
+        return init_data
+
+    def _validate_telegram_init_data(self, init_data: str):
+        if not init_data:
+            logger.error("Пустой init_data")
+            return False
+
+        # Пробуем использовать библиотеку telegram-init-data
+        try:
+            from telegram_init_data import is_valid
+
+            if not hasattr(settings, 'TELEGRAM_BOT_TOKEN') or not settings.TELEGRAM_BOT_TOKEN:
+                logger.warning("TELEGRAM_BOT_TOKEN не настроен")
+                return True
+
+            result = is_valid(init_data, settings.TELEGRAM_BOT_TOKEN, options=None)
+
+            if result is True:
+                return True
+            elif isinstance(result, str):
+                return result
+            elif result is False:
+                logger.error("Telegram init data проверка не пройдена")
+                return False
+            return result
+
+        except ImportError:
+            return self._validate_with_builtin(init_data)
+        except Exception as e:
+            logger.error(f"Ошибка при валидации init data: {str(e)}")
+            if settings.DEBUG:
+                return self._validate_with_builtin(init_data)
+            return False
+
+    def _validate_with_builtin(self, init_data: str) -> bool:
         if not hasattr(settings, 'TELEGRAM_BOT_TOKEN') or not settings.TELEGRAM_BOT_TOKEN:
-            # Если токен не задан, пропускаем проверку в целях разработки
+            logger.warning("TELEGRAM_BOT_TOKEN не настроен")
             return True
 
         try:
-            # Разбиваем строку на параметры
-            params = dict(urllib.parse.parse_qsl(init_data))
+            parsed_params = {}
+            for param in init_data.split('&'):
+                if '=' in param:
+                    key, value = param.split('=', 1)
+                    parsed_params[key] = value
 
-            # Извлекаем хэш
-            received_hash = params.pop('hash', '')
+            received_hash = parsed_params.get('hash')
+            if not received_hash:
+                logger.error("Хэш отсутствует в init_data")
+                return False
 
-            # Сортируем параметры по ключу
-            data_check_arr = [f"{key}={value}" for key, value in sorted(params.items())]
-            data_check_string = '\n'.join(data_check_arr)
+            items_to_sign = []
+            for key, value in sorted(parsed_params.items()):
+                if key == 'hash':
+                    continue
+                if key == 'signature':
+                    continue
 
-            # Создаем секретный ключ
-            secret_key = hashlib.sha256(settings.TELEGRAM_BOT_TOKEN.encode()).digest()
+                decoded_value = urllib.parse.unquote(value)
+                items_to_sign.append(f"{key}={decoded_value}")
 
-            # Вычисляем хэш
-            calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+            data_check_string = '\n'.join(items_to_sign)
 
-            return hmac.compare_digest(calculated_hash, received_hash)
-        except Exception:
-            # В целях разработки, если проверка не проходит, все равно разрешаем доступ
+            secret_key = hmac.new(
+                key=b'WebAppData',
+                msg=settings.TELEGRAM_BOT_TOKEN.encode(),
+                digestmod=hashlib.sha256
+            ).digest()
+
+            expected_hash = hmac.new(
+                secret_key,
+                data_check_string.encode(),
+                hashlib.sha256
+            ).hexdigest()
+
+            if not hmac.compare_digest(expected_hash, received_hash):
+                logger.error(f"Хэши не совпадают")
+                return False
+
             return True
 
-    def parse_user_data(self, init_data):
-        """
-        Парсит данные пользователя из строки инициализации
-        """
-        try:
-            params = dict(urllib.parse.parse_qsl(init_data))
-            user_json = params.get('user')
+        except Exception as e:
+            logger.error(f"Ошибка при проверке подписи: {str(e)}")
+            if settings.DEBUG:
+                return True
+            return False
 
+    def _extract_user_from_init_data(self, init_data: str) -> Optional[dict]:
+        try:
+            parsed_params = {}
+            for param in init_data.split('&'):
+                if '=' in param:
+                    key, value = param.split('=', 1)
+                    decoded_value = urllib.parse.unquote(value)
+                    parsed_params[key] = decoded_value
+
+            user_json = parsed_params.get('user')
             if not user_json:
+                logger.error("Параметр 'user' не найден в init_data")
                 return None
 
-            import json
-            user_data = json.loads(urllib.parse.unquote(user_json))
-            return user_data
-        except Exception:
+            return json.loads(user_json)
+
+        except Exception as e:
+            logger.error(f"Ошибка при извлечении данных пользователя: {str(e)}")
             return None
 
-    def get_or_create_user(self, user_data):
-        """
-        Создает или возвращает существующего пользователя
-        """
+    def _parse_user_json(self, user_json_str: str) -> Optional[dict]:
+        try:
+            if user_json_str.startswith('user='):
+                json_str = user_json_str[5:]
+            else:
+                json_str = user_json_str
+
+            decoded_json = urllib.parse.unquote(json_str)
+            user_data = json.loads(decoded_json)
+
+            if 'id' not in user_data:
+                logger.error("В данных пользователя отсутствует поле 'id'")
+                return None
+
+            return user_data
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Ошибка декодирования JSON: {str(e)}")
+            return None
+        except Exception as e:
+            logger.error(f"Ошибка при парсинге JSON: {str(e)}")
+            return None
+
+    def _get_or_create_user(self, user_data: dict) -> Tuple[User, bool]:
         telegram_id = user_data.get('id')
 
         if not telegram_id:
             raise AuthenticationFailed('Telegram ID not found in init data')
 
-        # Ищем пользователя по telegram_id
         try:
             user = User.objects.get(telegram_id=telegram_id)
+            self._update_user_if_needed(user, user_data)
+            return user, False
+
         except User.DoesNotExist:
-            # Создаем нового пользователя
             username = f"tg_{telegram_id}"
-            if 'username' in user_data:
+            if user_data.get('username'):
                 username = user_data['username']
 
             user = User.objects.create(
@@ -111,5 +208,23 @@ class TelegramAuthentication(authentication.BaseAuthentication):
                 last_name=user_data.get('last_name', ''),
                 email=user_data.get('email', ''),
             )
+            logger.info(f"Создан новый пользователь: {username} (telegram_id: {telegram_id})")
+            return user, True
 
-        return user, user.telegram_id is None
+    def _update_user_if_needed(self, user: User, user_data: dict) -> None:
+        updated = False
+
+        if user.first_name != user_data.get('first_name', ''):
+            user.first_name = user_data.get('first_name', '')
+            updated = True
+
+        if user.last_name != user_data.get('last_name', ''):
+            user.last_name = user_data.get('last_name', '')
+            updated = True
+
+        if user.username != user_data.get('username', f"tg_{user.telegram_id}"):
+            user.username = user_data.get('username', f"tg_{user.telegram_id}")
+            updated = True
+
+        if updated:
+            user.save()

@@ -16,11 +16,23 @@ const OrdersPage: React.FC = () => {
     error
   } = useQuery({
     queryKey: ['orders'],
-    queryFn: () => apiClient.getOrders().then(res => res.data),
+    queryFn: async () => {
+      const res = await apiClient.getOrders();
+      if (res.success && res.data) {
+        // Check if response is paginated (has results field)
+        if (res.data.results !== undefined) {
+          return res.data.results;
+        } else {
+          // If not paginated, return the data directly
+          return res.data;
+        }
+      }
+      return [];
+    },
     staleTime: 5 * 60 * 1000, // 5 минут
   });
 
-  const allOrders = ordersData?.orders || [];
+  const allOrders = ordersData || [];
 
   // Фильтруем заказы по статусу
   const activeOrders = allOrders.filter(order =>
