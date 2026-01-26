@@ -1,3 +1,4 @@
+
 from rest_framework import viewsets, generics, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -31,6 +32,7 @@ from .serializers import (
     BonusRuleSerializer, UserBonusTransactionSerializer, AdminRestaurantSerializer,
     ProductCreateUpdateSerializer
 )
+from .authentication import TelegramAuthentication
 
 
 @csrf_exempt

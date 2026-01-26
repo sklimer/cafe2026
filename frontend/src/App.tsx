@@ -1,7 +1,9 @@
+
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 
+import RestaurantListPage from './pages/RestaurantListPage';
 import MenuPage from './pages/MenuPage';
 import ProductPage from './pages/ProductPage';
 import AddressesPage from './pages/AddressesPage';
@@ -28,7 +30,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/" element={<Layout />}>
-            <Route index element={<MenuPage />} />
+            <Route index element={<RestaurantListPage />} />
             <Route path="/menu/:restaurantId" element={<MenuPage />} />
             <Route path="/product/:productId" element={<ProductPage />} />
             <Route path="/addresses" element={<AddressesPage />} />

@@ -1,3 +1,4 @@
+
 """
 Django settings for telegram_mini_app project.
 """
@@ -188,6 +189,20 @@ CORS_ALLOWED_ORIGINS = [
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False  # Убедитесь, что это False для безопасности
+
+# Разрешаем дополнительные заголовки, включая X-Telegram-Init-Data
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'x-telegram-init-data',  # Добавляем заголовок для Telegram Mini Apps
+]
 
 
 # CSRF settings for API
