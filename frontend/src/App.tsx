@@ -31,7 +31,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/" element={<Layout />}>
-            <Route index element={<RestaurantListPage />} />
+            <Route index element={<MenuPage />} />
             {/* Используйте ChatBurgerMenu вместо обычного MenuPage */}
             <Route path="/menu/:restaurantId" element={<MenuPage />} />
             <Route path="/product/:productId" element={<ProductPage />} />

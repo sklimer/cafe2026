@@ -1,3 +1,4 @@
+
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
@@ -5,7 +6,7 @@ from restaurants.models import Restaurant, RestaurantBranch
 
 
 class Category(models.Model):
-    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='categories', db_index=True)
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='categories', db_index=True, null=True, blank=True)
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children', db_index=True)
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255)
@@ -53,7 +54,7 @@ class Category(models.Model):
 
 
 class Tag(models.Model):
-    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='tags', db_index=True)
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='tags', db_index=True, null=True, blank=True)
     name = models.CharField(max_length=100)
     slug = models.SlugField(max_length=100)
     description = models.TextField(blank=True)
@@ -87,7 +88,7 @@ class Tag(models.Model):
 
 
 class Product(models.Model):
-    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='products', db_index=True)
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='products', db_index=True, null=True, blank=True)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='products', db_index=True)
 
     name = models.CharField(max_length=255)
@@ -191,7 +192,7 @@ class Product(models.Model):
 
 
 class ProductOption(models.Model):
-    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='product_options', db_index=True)
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='product_options', db_index=True, null=True, blank=True)
 
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)

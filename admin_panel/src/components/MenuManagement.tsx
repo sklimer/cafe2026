@@ -51,7 +51,6 @@ interface Product {
   id: number;
   name: string;
   category: string;
-  restaurant: number;
   price: number;
   costPrice: number;
   isAvailable: boolean;
@@ -70,7 +69,6 @@ const MenuManagement = () => {
   // Состояния для формы категории
   const [categoryForm, setCategoryForm] = useState({
     name: '',
-    restaurantId: '',
     parentId: '',
     description: '',
   });
@@ -79,7 +77,6 @@ const MenuManagement = () => {
   const [productForm, setProductForm] = useState({
     name: '',
     category: '',
-    restaurant: '',
     price: '',
     costPrice: '',
     isAvailable: false,
@@ -342,7 +339,6 @@ const MenuManagement = () => {
   const handleAddCategory = () => {
     setCategoryForm({
       name: '',
-      restaurantId: '',
       parentId: '',
       description: '',
     });
@@ -358,6 +354,7 @@ const MenuManagement = () => {
       isAvailable: false,
       stockQuantity: '',
       tags: '',
+      description: '',
     });
     setOpenProductDialog(false);
   };
@@ -365,7 +362,6 @@ const MenuManagement = () => {
   const handleCloseCategoryDialog = () => {
     setCategoryForm({
       name: '',
-      restaurantId: '',
       parentId: '',
       description: '',
     });
@@ -402,19 +398,13 @@ const MenuManagement = () => {
         return;
       }
 
-      if (!productForm.restaurant) {
-        alert('Пожалуйста, выберите ресторан');
-        return;
-      }
-
-      if (!productForm.description) {
-        alert('Пожалуйста, заполните описание товара');
-        return;
-      }
+      // if (!productForm.description) {
+      //   alert('Пожалуйста, заполните описание товара');
+      //   return;
+      // }
 
       const productData = {
         name: productForm.name,
-        restaurant: parseInt(productForm.restaurant),
         category: productForm.category ? parseInt(productForm.category) : null,
         description: productForm.description,
         price: parseFloat(productForm.price) || 0,
@@ -422,6 +412,7 @@ const MenuManagement = () => {
         is_available: productForm.isAvailable,
         stock_quantity: parseInt(productForm.stockQuantity) || 0,
         tags: productForm.tags ? productForm.tags.split(',').map(tag => tag.trim()).filter(tag => tag) : [],
+        restaurant: 1, // Временное значение по умолчанию
       };
 
       console.log('Submitting product:', productData);
@@ -457,7 +448,6 @@ const MenuManagement = () => {
       setProductForm({
         name: '',
         category: '',
-        restaurant: '',
         price: '',
         costPrice: '',
         isAvailable: false,
@@ -480,15 +470,9 @@ const MenuManagement = () => {
         return;
       }
 
-      if (!categoryForm.restaurantId) {
-        alert('Пожалуйста, выберите ресторан');
-        return;
-      }
-
       const categoryData = {
         name: categoryForm.name,
         parent: categoryForm.parentId ? parseInt(categoryForm.parentId) : null,
-        restaurant: parseInt(categoryForm.restaurantId),
         description: categoryForm.description || '',
       };
 
@@ -632,21 +616,6 @@ const MenuManagement = () => {
               required
             />
             <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel>Ресторан *</InputLabel>
-              <Select
-                name="restaurant"
-                label="Ресторан *"
-                value={productForm.restaurant}
-                onChange={handleProductFormChange}
-                required
-              >
-                <MenuItem value="">Выберите ресторан</MenuItem>
-                {restaurants.map(restaurant => (
-                  <MenuItem key={restaurant.id} value={restaurant.id}>{restaurant.name}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl fullWidth sx={{ mb: 2 }}>
               <InputLabel>Категория</InputLabel>
               <Select
                 name="category"
@@ -764,20 +733,6 @@ const MenuManagement = () => {
               onChange={handleCategoryFormChange}
               sx={{ mb: 2 }}
             />
-            <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel>Ресторан *</InputLabel>
-              <Select
-                name="restaurantId"
-                label="Ресторан *"
-                value={categoryForm.restaurantId}
-                onChange={handleCategoryFormChange}
-                required
-              >
-                {restaurants.map(restaurant => (
-                  <MenuItem key={restaurant.id} value={restaurant.id}>{restaurant.name}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
             <FormControl fullWidth sx={{ mb: 2 }}>
               <InputLabel>Родительская категория</InputLabel>
               <Select

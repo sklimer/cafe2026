@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,7 +20,6 @@ const chatBurgerStyles = {
 };
 
 const ChatBurgerMenu: React.FC = () => {
-  const { restaurantId } = useParams<{ restaurantId: string }>();
   const navigate = useNavigate();
   const { addItem, subtotal, items } = useCartStore();
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -30,14 +30,12 @@ const ChatBurgerMenu: React.FC = () => {
 
   // Загрузка данных
   const { data: menuData, isLoading } = useQuery({
-    queryKey: ['menu', restaurantId],
-    queryFn: () => apiClient.getCategories(restaurantId!).then(res => res.data),
-    enabled: !!restaurantId,
+    queryKey: ['menu'],
+    queryFn: () => apiClient.getCategories().then(res => res.data),
   });
 
   const categories = menuData?.categories || [];
   const products = menuData?.products || [];
-  const restaurant = menuData?.restaurant;
 
   // Установка активной категории
   useEffect(() => {
@@ -47,9 +45,9 @@ const ChatBurgerMenu: React.FC = () => {
   }, [categories]);
 
   // Фильтрация продуктов по категории
-  const productsByCategory = products.filter(
-    product => product.categoryId === activeCategory
-  );
+  const productsByCategory = activeCategory
+    ? products.filter(product => product.categoryId === activeCategory)
+    : products; // Если нет активной категории, показываем все продукты
 
   // Группировка продуктов по тегам (для секций как в ChatBurger)
   const groupedProducts = productsByCategory.reduce((groups, product) => {

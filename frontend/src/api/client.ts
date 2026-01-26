@@ -349,3 +349,4 @@ export const apiClient = new ApiClient();
 if (process.env.NODE_ENV === 'development') {
   (window as any).apiLogs = apiClient.getLogs.bind(apiClient);
 }
+}
