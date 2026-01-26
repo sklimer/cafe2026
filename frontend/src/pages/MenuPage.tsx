@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -47,8 +48,22 @@ const MenuPage: React.FC = () => {
 
       // В зависимости от структуры ответа
       if (response.success) {
-        // Если response уже имеет структуру { success: true, data: {...} }
-        return response.data;
+        // Преобразуем продукты, чтобы убедиться, что у них правильное поле categoryId
+        let transformedData = response.data;
+
+        if (transformedData && transformedData.products) {
+          transformedData = {
+            ...transformedData,
+            products: transformedData.products.map((product: any) => ({
+              ...product,
+              // Убедимся, что у продукта есть поле categoryId
+              categoryId: product.categoryId || product.category || (product.category?.id || null),
+              restaurantId: product.restaurantId || product.restaurant || (product.restaurant?.id || null)
+            }))
+          };
+        }
+
+        return transformedData;
       } else {
         // Если response это прямые данные
         console.log('⚠️ Ответ не содержит success: true', response);
@@ -96,6 +111,32 @@ const MenuPage: React.FC = () => {
     productsLength: products.length,
     restaurantName: restaurant?.name
   });
+
+  // Дополнительные логи для отладки
+  useEffect(() => {
+    if (categories.length > 0 && products.length > 0) {
+      console.log('📋 Информация о первой категории:', {
+        id: categories[0].id,
+        name: categories[0].name,
+        restaurantId: categories[0].restaurantId
+      });
+
+      console.log('📋 Информация о первом продукте:', {
+        id: products[0].id,
+        name: products[0].name,
+        categoryId: products[0].categoryId, // Теперь должно быть правильно
+        restaurantId: products[0].restaurantId
+      });
+
+      console.log('📋 Активная категория:', activeCategory);
+
+      // Проверяем, какие продукты подходят под активную категорию
+      const filteredProducts = products.filter(
+        product => product.categoryId === activeCategory
+      );
+      console.log('📋 Отфильтрованные продукты:', filteredProducts);
+    }
+  }, [categories, products, activeCategory]);
 
   // Функция для добавления товара в корзину
   const handleAddToCart = (product: Product) => {

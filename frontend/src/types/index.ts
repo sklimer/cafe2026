@@ -1,3 +1,4 @@
+
 // Типы для тегов
 export interface Tag {
   id: string;
@@ -27,6 +28,9 @@ export interface Product {
   isNew: boolean;
   createdAt: string;
   updatedAt: string;
+  // Дополнительные поля, которые могут приходить из API
+  category?: string | { id: string }; // Может быть ID или объектом
+  restaurant?: string | { id: string }; // Может быть ID или объектом
 }
 
 export interface ProductOption {
