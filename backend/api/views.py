@@ -422,7 +422,7 @@ class ProductViewSet(viewsets.ModelViewSet):
     """
     from django_filters.rest_framework import DjangoFilterBackend
     from rest_framework import filters
-    from rest_framework.parsers import MultiPartParser, FormParser
+    from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
     queryset = Product.objects.all()  # Changed to all to allow admin management
     serializer_class = ProductSerializer
