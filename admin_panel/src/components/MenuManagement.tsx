@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -25,6 +24,11 @@ import {
   Collapse,
   Switch,
   FormControlLabel,
+  Grid,
+  Card,
+  CardContent,
+  CardActions,
+  Divider,
 } from '@mui/material';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
@@ -32,6 +36,8 @@ import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import LocalOfferIcon from '@mui/icons-material/LocalOffer';
+import SettingsIcon from '@mui/icons-material/Settings';
 import { menuAPI, restaurantsAPI } from '../services/api';
 
 // Обновленный интерфейс на основе того, что возвращает API
@@ -60,9 +66,25 @@ interface Product {
   description: string;
 }
 
+interface Tag {
+  id: number;
+  name: string;
+  color: string;
+}
+
+interface Option {
+  id: number;
+  name: string;
+  type: string;
+  required: boolean;
+  choices: string[];
+}
+
 const MenuManagement = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [options, setOptions] = useState<Option[]>([]);
   const [restaurants, setRestaurants] = useState<{id: number, name: string}[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -81,8 +103,22 @@ const MenuManagement = () => {
     costPrice: '',
     isAvailable: false,
     stockQuantity: '',
-    tags: '',
+    tags: [] as string[],
     description: '',
+  });
+
+  // Состояния для формы тега
+  const [tagForm, setTagForm] = useState({
+    name: '',
+    color: '#1976d2',
+  });
+
+  // Состояния для формы опции
+  const [optionForm, setOptionForm] = useState({
+    name: '',
+    type: 'select',
+    required: false,
+    choices: [''],
   });
 
   useEffect(() => {
@@ -91,13 +127,12 @@ const MenuManagement = () => {
         console.log('Starting to fetch data...');
 
         // Получаем данные параллельно
-        const [categoriesRes, productsRes, restaurantsRes] = await Promise.allSettled([
+        const [categoriesRes, productsRes] = await Promise.allSettled([
           menuAPI.getCategories(),
           menuAPI.getProducts(),
-          restaurantsAPI.getAll()
         ]);
 
-        console.log('All promises settled:', { categoriesRes, productsRes, restaurantsRes });
+        console.log('All promises settled:', { categoriesRes, productsRes });
 
         // Обработка категорий
         if (categoriesRes.status === 'fulfilled') {
@@ -155,7 +190,8 @@ const MenuManagement = () => {
             isAvailable: product.is_available || product.isAvailable || false,
             stockQuantity: product.stock_quantity || product.stockQuantity || 0,
             orderCount: product.order_count || product.orderCount || 0,
-            tags: product.tags || []
+            tags: product.tags || [],
+            description: product.description || '',
           }));
 
           console.log('Transformed products:', transformedProducts);
@@ -164,28 +200,19 @@ const MenuManagement = () => {
           console.error('Failed to fetch products:', productsRes.reason);
         }
 
-        // Обработка ресторанов
-        if (restaurantsRes.status === 'fulfilled') {
-          const data = restaurantsRes.value.data;
-          console.log('Raw restaurants data from API:', data);
+        // Заглушки для тегов и опций
+        setTags([
+          { id: 1, name: 'Новинка', color: '#4caf50' },
+          { id: 2, name: 'Хит продаж', color: '#ff9800' },
+          { id: 3, name: 'Вегетарианское', color: '#8bc34a' },
+          { id: 4, name: 'Острое', color: '#f44336' },
+        ]);
 
-          let restaurantsArray: any[] = [];
-
-          if (Array.isArray(data)) {
-            restaurantsArray = data;
-          } else if (data && data.results && Array.isArray(data.results)) {
-            restaurantsArray = data.results;
-          } else if (data && data.data && Array.isArray(data.data)) {
-            restaurantsArray = data.data;
-          } else {
-            console.warn('Unexpected restaurants data format:', data);
-          }
-
-          console.log('Restaurants array:', restaurantsArray);
-          setRestaurants(restaurantsArray.map(r => ({ id: r.id, name: r.name })));
-        } else {
-          console.error('Failed to fetch restaurants:', restaurantsRes.reason);
-        }
+        setOptions([
+          { id: 1, name: 'Размер порции', type: 'select', required: true, choices: ['Маленькая', 'Средняя', 'Большая'] },
+          { id: 2, name: 'Дополнительные ингредиенты', type: 'multi', required: false, choices: ['Сыр', 'Бекон', 'Грибы', 'Оливки'] },
+          { id: 3, name: 'Степень прожарки', type: 'select', required: false, choices: ['С кровью', 'Средняя', 'Полная'] },
+        ]);
 
         setLoading(false);
       } catch (error) {
@@ -200,6 +227,8 @@ const MenuManagement = () => {
   const [selectedProducts, setSelectedProducts] = useState<number[]>([]);
   const [openProductDialog, setOpenProductDialog] = useState(false);
   const [openCategoryDialog, setOpenCategoryDialog] = useState(false);
+  const [openTagDialog, setOpenTagDialog] = useState(false);
+  const [openOptionDialog, setOpenOptionDialog] = useState(false);
   const [currentTab, setCurrentTab] = useState(0);
   const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
 
@@ -284,9 +313,7 @@ const MenuManagement = () => {
 
   // Функция для отображения дерева категорий
   const renderCategoryTree = (categoriesList: Category[], parentId: number | null = null, level: number = 0) => {
-    // Фильтруем категории по parentId
     const filtered = categoriesList.filter(cat => {
-      // Если parentId null, ищем корневые категории (те, у которых parent = null или undefined)
       if (parentId === null) {
         return !cat.parent || cat.parent === null;
       }
@@ -298,7 +325,6 @@ const MenuManagement = () => {
     }
 
     return filtered.map(category => {
-      // Проверяем, есть ли у категории дети
       const hasChildren = categoriesList.some(cat => cat.parent === category.id);
 
       return (
@@ -345,6 +371,24 @@ const MenuManagement = () => {
     setOpenCategoryDialog(true);
   };
 
+  const handleAddTag = () => {
+    setTagForm({
+      name: '',
+      color: '#1976d2',
+    });
+    setOpenTagDialog(true);
+  };
+
+  const handleAddOption = () => {
+    setOptionForm({
+      name: '',
+      type: 'select',
+      required: false,
+      choices: [''],
+    });
+    setOpenOptionDialog(true);
+  };
+
   const handleCloseProductDialog = () => {
     setProductForm({
       name: '',
@@ -353,7 +397,7 @@ const MenuManagement = () => {
       costPrice: '',
       isAvailable: false,
       stockQuantity: '',
-      tags: '',
+      tags: [],
       description: '',
     });
     setOpenProductDialog(false);
@@ -366,6 +410,24 @@ const MenuManagement = () => {
       description: '',
     });
     setOpenCategoryDialog(false);
+  };
+
+  const handleCloseTagDialog = () => {
+    setTagForm({
+      name: '',
+      color: '#1976d2',
+    });
+    setOpenTagDialog(false);
+  };
+
+  const handleCloseOptionDialog = () => {
+    setOptionForm({
+      name: '',
+      type: 'select',
+      required: false,
+      choices: [''],
+    });
+    setOpenOptionDialog(false);
   };
 
   const handleProductFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -384,10 +446,57 @@ const MenuManagement = () => {
     });
   };
 
+  const handleTagFormChange = (e: any) => {
+    const { name, value } = e.target;
+    setTagForm({
+      ...tagForm,
+      [name]: value,
+    });
+  };
+
+  const handleOptionFormChange = (e: any) => {
+    const { name, value } = e.target;
+    setOptionForm({
+      ...optionForm,
+      [name]: value,
+    });
+  };
+
   const handleSwitchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setProductForm({
       ...productForm,
       isAvailable: e.target.checked,
+    });
+  };
+
+  const handleOptionSwitchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setOptionForm({
+      ...optionForm,
+      required: e.target.checked,
+    });
+  };
+
+  const handleChoiceChange = (index: number, value: string) => {
+    const newChoices = [...optionForm.choices];
+    newChoices[index] = value;
+    setOptionForm({
+      ...optionForm,
+      choices: newChoices,
+    });
+  };
+
+  const addChoice = () => {
+    setOptionForm({
+      ...optionForm,
+      choices: [...optionForm.choices, ''],
+    });
+  };
+
+  const removeChoice = (index: number) => {
+    const newChoices = optionForm.choices.filter((_, i) => i !== index);
+    setOptionForm({
+      ...optionForm,
+      choices: newChoices,
     });
   };
 
@@ -398,11 +507,6 @@ const MenuManagement = () => {
         return;
       }
 
-      // if (!productForm.description) {
-      //   alert('Пожалуйста, заполните описание товара');
-      //   return;
-      // }
-
       const productData = {
         name: productForm.name,
         category: productForm.category ? parseInt(productForm.category) : null,
@@ -411,8 +515,8 @@ const MenuManagement = () => {
         cost_price: parseFloat(productForm.costPrice) || 0,
         is_available: productForm.isAvailable,
         stock_quantity: parseInt(productForm.stockQuantity) || 0,
-        tags: productForm.tags ? productForm.tags.split(',').map(tag => tag.trim()).filter(tag => tag) : [],
-        restaurant: 1, // Временное значение по умолчанию
+        tags: productForm.tags,
+        restaurant: 1,
       };
 
       console.log('Submitting product:', productData);
@@ -438,13 +542,12 @@ const MenuManagement = () => {
         isAvailable: product.is_available || product.isAvailable || false,
         stockQuantity: product.stock_quantity || product.stockQuantity || 0,
         orderCount: product.order_count || product.orderCount || 0,
-        tags: product.tags || []
+        tags: product.tags || [],
+        description: product.description || '',
       }));
 
       setProducts(transformedProducts);
       setOpenProductDialog(false);
-
-      // Сброс формы
       setProductForm({
         name: '',
         category: '',
@@ -452,7 +555,7 @@ const MenuManagement = () => {
         costPrice: '',
         isAvailable: false,
         stockQuantity: '',
-        tags: '',
+        tags: [],
         description: '',
       });
 
@@ -492,11 +595,8 @@ const MenuManagement = () => {
 
       setCategories(categoriesArray);
       setOpenCategoryDialog(false);
-
-      // Сброс формы
       setCategoryForm({
         name: '',
-        restaurantId: '',
         parentId: '',
         description: '',
       });
@@ -507,6 +607,204 @@ const MenuManagement = () => {
       alert('Ошибка при создании категории');
     }
   };
+
+  const handleSubmitTag = () => {
+    const newTag = {
+      id: tags.length + 1,
+      name: tagForm.name,
+      color: tagForm.color,
+    };
+    setTags([...tags, newTag]);
+    setOpenTagDialog(false);
+    setTagForm({
+      name: '',
+      color: '#1976d2',
+    });
+  };
+
+  const handleSubmitOption = () => {
+    const newOption = {
+      id: options.length + 1,
+      name: optionForm.name,
+      type: optionForm.type,
+      required: optionForm.required,
+      choices: optionForm.choices.filter(choice => choice.trim() !== ''),
+    };
+    setOptions([...options, newOption]);
+    setOpenOptionDialog(false);
+    setOptionForm({
+      name: '',
+      type: 'select',
+      required: false,
+      choices: [''],
+    });
+  };
+
+  const renderCategoriesTab = () => (
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <Button variant="contained" onClick={handleAddCategory} startIcon={<AddIcon />}>
+          Добавить категорию
+        </Button>
+      </Box>
+      <Paper sx={{ p: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          Дерево категорий ({categories.length})
+        </Typography>
+        {loading ? (
+          <Typography>Загрузка...</Typography>
+        ) : categories.length > 0 ? (
+          <List>
+            {renderCategoryTree(categories)}
+          </List>
+        ) : (
+          <Box sx={{ p: 2, textAlign: 'center' }}>
+            <Typography color="text.secondary">
+              Категории не найдены
+            </Typography>
+          </Box>
+        )}
+      </Paper>
+    </Box>
+  );
+
+  const renderProductsTab = () => (
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <Button variant="contained" onClick={handleAddProduct} startIcon={<AddIcon />}>
+          Добавить товар
+        </Button>
+      </Box>
+      <Paper sx={{ height: 600 }}>
+        <Typography variant="h6" sx={{ p: 2 }}>
+          Товары ({products.length})
+        </Typography>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+            <Typography>Загрузка...</Typography>
+          </Box>
+        ) : products.length > 0 ? (
+          <DataGrid
+            rows={products}
+            columns={productColumns}
+            pageSizeOptions={[5, 10, 20]}
+            initialState={{
+              pagination: {
+                paginationModel: { pageSize: 10 },
+              },
+            }}
+            checkboxSelection={false}
+            disableRowSelectionOnClick
+          />
+        ) : (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography color="text.secondary">
+                Товары не найдены
+              </Typography>
+            </Box>
+          </Box>
+        )}
+      </Paper>
+    </Box>
+  );
+
+  const renderTagsTab = () => (
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <Button variant="contained" onClick={handleAddTag} startIcon={<AddIcon />}>
+          Добавить тег
+        </Button>
+      </Box>
+      <Grid container spacing={2}>
+        {tags.map((tag) => (
+          <Grid item xs={12} sm={6} md={4} key={tag.id}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <LocalOfferIcon sx={{ color: tag.color, mr: 1 }} />
+                  <Typography variant="h6">{tag.name}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Box
+                    sx={{
+                      width: 20,
+                      height: 20,
+                      backgroundColor: tag.color,
+                      borderRadius: 1,
+                      mr: 1,
+                    }}
+                  />
+                  <Typography variant="body2" color="text.secondary">
+                    {tag.color}
+                  </Typography>
+                </Box>
+              </CardContent>
+              <CardActions>
+                <IconButton size="small">
+                  <EditIcon />
+                </IconButton>
+                <IconButton size="small">
+                  <DeleteIcon />
+                </IconButton>
+              </CardActions>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+    </Box>
+  );
+
+  const renderOptionsTab = () => (
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <Button variant="contained" onClick={handleAddOption} startIcon={<AddIcon />}>
+          Добавить опцию
+        </Button>
+      </Box>
+      <Grid container spacing={2}>
+        {options.map((option) => (
+          <Grid item xs={12} md={6} key={option.id}>
+            <Card>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <SettingsIcon sx={{ mr: 1 }} />
+                    <Typography variant="h6">{option.name}</Typography>
+                  </Box>
+                  <Chip
+                    label={option.required ? 'Обязательная' : 'Необязательная'}
+                    color={option.required ? 'error' : 'default'}
+                    size="small"
+                  />
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                  Тип: {option.type === 'select' ? 'Выбор одного' : 'Множественный выбор'}
+                </Typography>
+                <Divider sx={{ my: 1 }} />
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Варианты выбора:
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {option.choices.map((choice, index) => (
+                    <Chip key={index} label={choice} size="small" />
+                  ))}
+                </Box>
+              </CardContent>
+              <CardActions>
+                <IconButton size="small">
+                  <EditIcon />
+                </IconButton>
+                <IconButton size="small">
+                  <DeleteIcon />
+                </IconButton>
+              </CardActions>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+    </Box>
+  );
 
   return (
     <Box sx={{ flexGrow: 1 }}>
@@ -521,82 +819,18 @@ const MenuManagement = () => {
           variant="outlined"
           sx={{ mb: 2 }}
         />
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Tabs value={currentTab} onChange={(e, newValue) => setCurrentTab(newValue)}>
-            <Tab label="Категории" />
-            <Tab label="Товары" />
-            <Tab label="Теги" />
-            <Tab label="Опции" />
-          </Tabs>
-          <Box>
-            <Button variant="contained" onClick={handleAddCategory} sx={{ mr: 1 }}>
-              <AddIcon sx={{ mr: 1 }} /> Категория
-            </Button>
-            <Button variant="contained" onClick={handleAddProduct}>
-              <AddIcon sx={{ mr: 1 }} /> Товар
-            </Button>
-          </Box>
-        </Box>
+        <Tabs value={currentTab} onChange={(e, newValue) => setCurrentTab(newValue)}>
+          <Tab label="Категории" />
+          <Tab label="Товары" />
+          <Tab label="Теги" />
+          <Tab label="Опции" />
+        </Tabs>
       </Paper>
 
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-          <Typography>Загрузка...</Typography>
-        </Box>
-      ) : (
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <Paper sx={{ width: '30%', p: 2, maxHeight: 600, overflow: 'auto' }}>
-            <Typography variant="h6" gutterBottom>
-              Категории ({categories.length})
-            </Typography>
-            <List>
-              {categories.length > 0 ? (
-                renderCategoryTree(categories)
-              ) : (
-                <Box sx={{ p: 2, textAlign: 'center' }}>
-                  <Typography color="text.secondary">
-                    Категории не найдены
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Проверьте endpoint API или создайте первую категорию
-                  </Typography>
-                </Box>
-              )}
-            </List>
-          </Paper>
-
-          <Paper sx={{ width: '70%', height: 600 }}>
-            <Typography variant="h6" sx={{ p: 2 }}>
-              Товары ({products.length})
-            </Typography>
-            {products.length > 0 ? (
-              <DataGrid
-                rows={products}
-                columns={productColumns}
-                pageSizeOptions={[5, 10, 20]}
-                initialState={{
-                  pagination: {
-                    paginationModel: { pageSize: 10 },
-                  },
-                }}
-                checkboxSelection={false}
-                disableRowSelectionOnClick
-              />
-            ) : (
-              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography color="text.secondary">
-                    Товары не найдены
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Создайте первый товар или проверьте endpoint API
-                  </Typography>
-                </Box>
-              </Box>
-            )}
-          </Paper>
-        </Box>
-      )}
+      {currentTab === 0 && renderCategoriesTab()}
+      {currentTab === 1 && renderProductsTab()}
+      {currentTab === 2 && renderTagsTab()}
+      {currentTab === 3 && renderOptionsTab()}
 
       {/* Product Dialog */}
       <Dialog open={openProductDialog} onClose={handleCloseProductDialog} maxWidth="md" fullWidth>
@@ -632,7 +866,7 @@ const MenuManagement = () => {
             <TextField
               name="description"
               margin="dense"
-              label="Описание *"
+              label="Описание"
               fullWidth
               variant="outlined"
               multiline
@@ -640,7 +874,6 @@ const MenuManagement = () => {
               value={productForm.description}
               onChange={handleProductFormChange}
               sx={{ mb: 2 }}
-              required
             />
             <TextField
               name="price"
@@ -685,17 +918,28 @@ const MenuManagement = () => {
               onChange={handleProductFormChange}
               sx={{ mb: 2 }}
             />
-            <TextField
-              name="tags"
-              margin="dense"
-              label="Теги (через запятую)"
-              fullWidth
-              variant="outlined"
-              value={productForm.tags}
-              onChange={handleProductFormChange}
-              sx={{ mb: 2 }}
-              placeholder="горячее, новинка, акция"
-            />
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Теги</InputLabel>
+              <Select
+                multiple
+                value={productForm.tags}
+                onChange={(e) => setProductForm({...productForm, tags: e.target.value as string[]})}
+                label="Теги"
+                renderValue={(selected) => (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {selected.map((value) => (
+                      <Chip key={value} label={value} />
+                    ))}
+                  </Box>
+                )}
+              >
+                {tags.map((tag) => (
+                  <MenuItem key={tag.id} value={tag.name}>
+                    {tag.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Box>
         </DialogContent>
         <DialogActions>
@@ -752,6 +996,114 @@ const MenuManagement = () => {
         <DialogActions>
           <Button onClick={handleCloseCategoryDialog}>Отмена</Button>
           <Button onClick={handleSubmitCategory} variant="contained">Создать</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Tag Dialog */}
+      <Dialog open={openTagDialog} onClose={handleCloseTagDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Добавить тег</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <TextField
+              name="name"
+              autoFocus
+              margin="dense"
+              label="Название тега *"
+              fullWidth
+              variant="outlined"
+              value={tagForm.name}
+              onChange={handleTagFormChange}
+              sx={{ mb: 2 }}
+              required
+            />
+            <TextField
+              name="color"
+              margin="dense"
+              label="Цвет"
+              fullWidth
+              variant="outlined"
+              type="color"
+              value={tagForm.color}
+              onChange={handleTagFormChange}
+              sx={{ mb: 2 }}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseTagDialog}>Отмена</Button>
+          <Button onClick={handleSubmitTag} variant="contained">Создать</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Option Dialog */}
+      <Dialog open={openOptionDialog} onClose={handleCloseOptionDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Добавить опцию</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <TextField
+              name="name"
+              autoFocus
+              margin="dense"
+              label="Название опции *"
+              fullWidth
+              variant="outlined"
+              value={optionForm.name}
+              onChange={handleOptionFormChange}
+              sx={{ mb: 2 }}
+              required
+            />
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Тип опции</InputLabel>
+              <Select
+                name="type"
+                label="Тип опции"
+                value={optionForm.type}
+                onChange={handleOptionFormChange}
+              >
+                <MenuItem value="select">Выбор одного</MenuItem>
+                <MenuItem value="multi">Множественный выбор</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={optionForm.required}
+                  onChange={handleOptionSwitchChange}
+                />
+              }
+              label="Обязательная опция"
+              sx={{ mb: 2, display: 'block' }}
+            />
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Варианты выбора:
+            </Typography>
+            {optionForm.choices.map((choice, index) => (
+              <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                <TextField
+                  fullWidth
+                  value={choice}
+                  onChange={(e) => handleChoiceChange(index, e.target.value)}
+                  label={`Вариант ${index + 1}`}
+                  variant="outlined"
+                  size="small"
+                />
+                <Button
+                  disabled={optionForm.choices.length === 1}
+                  onClick={() => removeChoice(index)}
+                  color="error"
+                >
+                  Удалить
+                </Button>
+              </Box>
+            ))}
+            <Button onClick={addChoice} startIcon={<AddIcon />}>
+              Добавить вариант
+            </Button>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseOptionDialog}>Отмена</Button>
+          <Button onClick={handleSubmitOption} variant="contained">Создать</Button>
         </DialogActions>
       </Dialog>
     </Box>
