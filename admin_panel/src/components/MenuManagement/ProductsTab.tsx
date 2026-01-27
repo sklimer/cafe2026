@@ -1,4 +1,6 @@
+
 import React, { useState, useRef } from 'react';
+import axios from 'axios';
 import {
   Box,
   Typography,
@@ -33,7 +35,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import ImageIcon from '@mui/icons-material/Image';
-import { menuAPI } from '../../services/api';
+import { menuAPI, getCsrfToken } from '../../services/api';
+import { env } from '../../config/env';
 
 interface Product {
   id: number;
@@ -430,28 +433,85 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
   };
 
   const uploadImages = async (productId: number): Promise<{ main_image_url: string; image_urls: string[] }> => {
-    // В реальном приложении здесь будет загрузка на сервер
-    // Для демонстрации просто возвращаем URLы
-    const mainImage = productImages.find(img => img.isMain);
-    const additionalImages = productImages.filter(img => !img.isMain);
+    const formData = new FormData();
 
-    return {
-      main_image_url: mainImage?.url || '',
-      image_urls: additionalImages.map(img => img.url)
-    };
+    // Find main image and additional images
+    const mainImage = productImages.find(img => img.isMain && img.file);
+    const additionalImages = productImages.filter(img => !img.isMain && img.file);
+
+    // Append main image if exists and is new
+    if (mainImage && mainImage.file && mainImage.isNew) {
+      formData.append('main_image', mainImage.file);
+    }
+
+    // Append additional images if they are new
+    additionalImages.forEach((img, index) => {
+      if (img.file && img.isNew) {
+        formData.append(`additional_images`, img.file);
+      }
+    });
+
+    // Only make API call if there are new images to upload
+    if ((mainImage && mainImage.file && mainImage.isNew) || additionalImages.some(img => img.file && img.isNew)) {
+      try {
+        // Create axios instance with multipart/form-data headers for file upload
+        const uploadApi = axios.create({
+          baseURL: env.REACT_APP_API_URL || '/api/',
+          withCredentials: true,
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        // Add CSRF token
+        const csrfToken = await getCsrfToken();
+        if (csrfToken) {
+          uploadApi.defaults.headers.common['X-CSRFToken'] = csrfToken;
+        }
+
+        // Upload images to a dedicated endpoint
+        const response = await uploadApi.post(`/products/${productId}/upload-images/`, formData);
+
+        // Return the uploaded image URLs from the response
+        return {
+          main_image_url: response.data.main_image_url || '',
+          image_urls: response.data.image_urls || []
+        };
+      } catch (error) {
+        console.error('Error uploading images:', error);
+        // If upload fails, return empty URLs
+        return {
+          main_image_url: '',
+          image_urls: []
+        };
+      }
+    } else {
+      // If no new images to upload, return empty strings since we don't want to send temporary URLs
+      // The images that were already stored on the server should remain unchanged
+      // We don't send any image URLs in this case to avoid overwriting with temporary URLs
+      return {
+        main_image_url: '',  // Don't update with temporary URLs
+        image_urls: []       // Don't update with temporary URLs
+      };
+    }
   };
 
   const updateProductWithImages = async (productId: number, productData: any) => {
     try {
-      // Если есть изображения, добавляем их к данным продукта
-      if (productImages.length > 0) {
+      // Check if there are new images to upload
+      const hasNewImages = productImages.some(img => img.file && img.isNew);
+
+      if (hasNewImages) {
         const uploadedImages = await uploadImages(productId);
 
-        // Используем PATCH для частичного обновления изображений
-        return await menuAPI.patchProduct(productId, {
-          main_image_url: uploadedImages.main_image_url,
-          image_urls: uploadedImages.image_urls
-        });
+        // Only update images if we have actual URLs from successful upload
+        if (uploadedImages.main_image_url || uploadedImages.image_urls.length > 0) {
+          // Используем PATCH для частичного обновления изображений
+          return await menuAPI.patchProduct(productId, {
+            main_image_url: uploadedImages.main_image_url,
+            image_urls: uploadedImages.image_urls
+          });
+        }
       }
       return null;
     } catch (uploadError: any) {

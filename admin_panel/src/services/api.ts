@@ -1,4 +1,3 @@
-
 // API service for admin panel
 import axios from 'axios';
 import { env } from '../config/env';
@@ -13,7 +12,7 @@ const api = axios.create({
 });
 
 // Function to get CSRF token
-const getCsrfToken = async (): Promise<string> => {
+export const getCsrfToken = async (): Promise<string> => {
   try {
     // Use a separate axios instance to get CSRF token since it might have different base URL requirements
     const csrfAxios = axios.create({
@@ -47,6 +46,17 @@ api.interceptors.request.use(
       if (csrfToken) {
         config.headers['X-CSRFToken'] = csrfToken;
       }
+    }
+
+    // Не устанавливаем Content-Type для FormData (браузер сделает это сам)
+    // Проверяем, является ли data FormData
+    if (config.data instanceof FormData) {
+      // Удаляем Content-Type, чтобы браузер установил правильный с boundary
+      delete config.headers['Content-Type'];
+    } else if (typeof config.data === 'object' && config.data !== null) {
+      // Для JSON объектов устанавливаем правильный Content-Type
+      config.headers['Content-Type'] = 'application/json';
+      config.data = JSON.stringify(config.data);
     }
 
     return config;
@@ -90,8 +100,40 @@ export const ordersAPI = {
 export const menuAPI = {
   getProducts: (params?: any) => api.get('/products', params),
   getProductById: (id: number) => api.get(`/products/${id}`),
-  createProduct: (data: any) => api.post('/products/', data),
-  updateProduct: (id: number, data: any) => api.put(`/products/${id}/`, data),
+  createProduct: (data: any) => {
+    const isFormData = data instanceof FormData;
+
+    const config = {
+      headers: isFormData ? {
+        'X-CSRFToken': csrfToken
+      } : {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken
+      }
+    };
+
+    return api.post('/products/', isFormData ? data : JSON.stringify(data), config);
+  },
+  updateProduct: (id: number, data: any) => {
+    // Проверяем, является ли data FormData (при загрузке файлов)
+    const isFormData = data instanceof FormData;
+
+    // Создаем отдельную конфигурацию для FormData
+    const config = {
+      headers: isFormData ? {
+        // Для FormData браузер сам установит правильный Content-Type с boundary
+        // Не устанавливаем Content-Type вручную для FormData
+        'X-CSRFToken': csrfToken
+      } : {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken
+      }
+    };
+
+    // Для FormData отправляем как есть, для JSON - строкифицируем
+    return api.put(`/products/${id}/`, isFormData ? data : JSON.stringify(data), config);
+  },
+  patchProduct: (id: number, data: any) => api.patch(`/products/${id}/`, data),
   deleteProduct: (id: number) => api.delete(`/products/${id}/`),
 
   getCategories: () => api.get('/categories'),

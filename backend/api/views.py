@@ -422,9 +422,11 @@ class ProductViewSet(viewsets.ModelViewSet):
     """
     from django_filters.rest_framework import DjangoFilterBackend
     from rest_framework import filters
+    from rest_framework.parsers import MultiPartParser, FormParser
 
     queryset = Product.objects.all()  # Changed to all to allow admin management
     serializer_class = ProductSerializer
+    parser_classes = [MultiPartParser, FormParser, JSONParser]  # Add support for file uploads
     filter_backends = [filters.SearchFilter, DjangoFilterBackend, filters.OrderingFilter]
     search_fields = ['name', 'description', 'short_description']
     filterset_fields = ['restaurant', 'category', 'is_available', 'is_popular', 'is_new',
@@ -479,6 +481,46 @@ class ProductViewSet(viewsets.ModelViewSet):
         # This would return the options available for this product
         # For now, returning a placeholder
         return Response({'product_id': product.id, 'options': []})
+
+    @action(detail=True, methods=['post'], url_path='upload-images')
+    def upload_images(self, request, pk=None):
+        """
+        Загрузка изображений для товара
+        POST /api/v1/products/{id}/upload-images/
+        """
+        from django.core.files.storage import default_storage
+        import os
+
+        product = self.get_object()
+
+        # Handle main image
+        main_image = request.FILES.get('main_image')
+        if main_image:
+            # Save the main image
+            file_path = default_storage.save(f'products/{product.id}/main_{main_image.name}', main_image)
+            product.main_image_url = f'/media/{file_path}'
+            product.save()
+
+        # Handle additional images
+        additional_images = request.FILES.getlist('additional_images')
+        image_urls = []
+        for img in additional_images:
+            file_path = default_storage.save(f'products/{product.id}/{img.name}', img)
+            image_urls.append(f'/media/{file_path}')
+
+        # Update image_urls field if needed (this assumes it stores a list of URLs)
+        if image_urls:
+            current_urls = product.image_urls or []
+            # Combine existing URLs with new ones, avoiding duplicates
+            all_urls = list(set(current_urls + image_urls))
+            product.image_urls = all_urls
+            product.save()
+
+        return Response({
+            'main_image_url': product.main_image_url,
+            'image_urls': product.image_urls or [],
+            'message': 'Images uploaded successfully'
+        })
 
     @action(detail=False, methods=['get'])
     def search(self, request):
