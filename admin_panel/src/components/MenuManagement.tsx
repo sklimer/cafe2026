@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -62,10 +61,10 @@ interface Category {
 interface Product {
   id: number;
   name: string;
-  category: string;
-  category_id?: number;
-  price: number | string;  // Price can come as string from API
-  costPrice: number | string;  // Cost price can come as string from API
+  category: string; // Для отображения в таблице
+  category_id?: number | null; // Для формы редактирования
+  price: number;
+  costPrice: number;
   isAvailable: boolean;
   stockQuantity: number;
   orderCount: number;
@@ -132,6 +131,70 @@ const MenuManagement = () => {
     choices: [''],
   });
 
+  // Функция для нормализации данных продукта из API
+  const normalizeProductData = (product: any): Product => {
+    console.log('Нормализация продукта:', product);
+
+    // Безопасное получение цены
+    let price = 0;
+    const priceValue = product.price || product.price_value || product.base_price;
+    if (priceValue !== undefined && priceValue !== null) {
+      price = typeof priceValue === 'string' ? parseFloat(priceValue) : Number(priceValue);
+      if (isNaN(price)) price = 0;
+    }
+
+    // Безопасное получение себестоимости
+    let costPrice = 0;
+    const costValue = product.cost_price || product.costPrice || product.cost || product.cost_value;
+    if (costValue !== undefined && costValue !== null) {
+      costPrice = typeof costValue === 'string' ? parseFloat(costValue) : Number(costValue);
+      if (isNaN(costPrice)) costPrice = 0;
+    }
+
+    // Безопасное получение категории
+    const categoryId = product.category_id || product.categoryId || product.category?.id || null;
+    const categoryName = product.category_name || product.category?.name ||
+                        product.category || 'Не указана';
+
+    // Безопасное получение доступности
+    let isAvailable = false;
+    if (product.is_available !== undefined && product.is_available !== null) {
+      isAvailable = Boolean(product.is_available);
+    } else if (product.isAvailable !== undefined && product.isAvailable !== null) {
+      isAvailable = Boolean(product.isAvailable);
+    } else if (product.available !== undefined && product.available !== null) {
+      isAvailable = Boolean(product.available);
+    } else if (product.status !== undefined && product.status !== null) {
+      isAvailable = product.status === 'available' || product.status === 'active';
+    }
+
+    // Безопасное получение тегов
+    let tags: string[] = [];
+    if (Array.isArray(product.tags)) {
+      tags = product.tags.map((tag: any) =>
+        typeof tag === 'string' ? tag : tag.name || tag.title || String(tag)
+      );
+    } else if (product.tags && typeof product.tags === 'object') {
+      tags = Object.values(product.tags).map((tag: any) =>
+        typeof tag === 'string' ? tag : tag.name || tag.title || String(tag)
+      );
+    }
+
+    return {
+      id: product.id,
+      name: product.name || 'Без названия',
+      category: categoryName,
+      category_id: categoryId,
+      price: price,
+      costPrice: costPrice,
+      isAvailable: isAvailable,
+      stockQuantity: product.stock_quantity || product.stockQuantity || product.stock || 0,
+      orderCount: product.order_count || product.orderCount || product.orders_count || 0,
+      tags: tags,
+      description: product.description || product.desc || '',
+    };
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -163,13 +226,6 @@ const MenuManagement = () => {
           }
 
           console.log('Processed categories array:', categoriesArray);
-
-          // Если категории не загрузились, попробуем другой эндпоинт
-          if (categoriesArray.length === 0) {
-            console.log('No categories found, trying alternative endpoint...');
-            // Можно попробовать другой endpoint здесь
-          }
-
           setCategories(categoriesArray);
         } else {
           console.error('Failed to fetch categories:', categoriesRes.reason);
@@ -179,6 +235,7 @@ const MenuManagement = () => {
         if (productsRes.status === 'fulfilled') {
           const data = productsRes.value.data;
           console.log('Raw products data from API:', data);
+          console.log('Raw products structure:', Object.keys(data));
 
           let productsArray: any[] = [];
 
@@ -188,24 +245,31 @@ const MenuManagement = () => {
             productsArray = data.results;
           } else if (data && data.data && Array.isArray(data.data)) {
             productsArray = data.data;
+          } else if (data && data.products && Array.isArray(data.products)) {
+            productsArray = data.products;
           } else {
             console.warn('Unexpected products data format:', data);
           }
 
-          const transformedProducts = productsArray.map((product: any) => ({
-            id: product.id,
-            name: product.name || 'Без названия',
-            category: product.category_name || product.category?.name || String(product.category_id || product.category || 'Не указана'),
-            price: parseFloat(product.price) || 0,
-            costPrice: parseFloat(product.cost_price || product.costPrice) || 0,
-            isAvailable: product.is_available || product.isAvailable || false,
-            stockQuantity: product.stock_quantity || product.stockQuantity || 0,
-            orderCount: product.order_count || product.orderCount || 0,
-            tags: product.tags || [],
-            description: product.description || '',
-          }));
+          console.log('Raw products array:', productsArray);
+
+          // Логируем первый продукт для отладки
+          if (productsArray.length > 0) {
+            console.log('First raw product:', productsArray[0]);
+            console.log('All keys in first product:', Object.keys(productsArray[0]));
+            console.log('First product cost_price:', productsArray[0].cost_price);
+            console.log('First product is_available:', productsArray[0].is_available);
+          }
+
+          const transformedProducts = productsArray.map(normalizeProductData);
 
           console.log('Transformed products:', transformedProducts);
+
+          // Логируем первый трансформированный продукт
+          if (transformedProducts.length > 0) {
+            console.log('First transformed product:', transformedProducts[0]);
+          }
+
           setProducts(transformedProducts);
         } else {
           console.error('Failed to fetch products:', productsRes.reason);
@@ -268,8 +332,9 @@ const MenuManagement = () => {
       headerName: 'Цена',
       width: 100,
       valueFormatter: (params) => {
-        const price = typeof params.value === 'number' ? params.value : parseFloat(params.value) || 0;
-        return `${price.toLocaleString('ru-RU')}₽`;
+        const value = params.value || 0;
+        const numValue = typeof value === 'number' ? value : parseFloat(value) || 0;
+        return `${numValue.toLocaleString('ru-RU', { minimumFractionDigits: 2 })}₽`;
       }
     },
     {
@@ -277,8 +342,9 @@ const MenuManagement = () => {
       headerName: 'Себестоимость',
       width: 150,
       valueFormatter: (params) => {
-        const costPrice = typeof params.value === 'number' ? params.value : parseFloat(params.value) || 0;
-        return `${costPrice.toLocaleString('ru-RU')}₽`;
+        const value = params.value || 0;
+        const numValue = typeof value === 'number' ? value : parseFloat(value) || 0;
+        return `${numValue.toLocaleString('ru-RU', { minimumFractionDigits: 2 })}₽`;
       }
     },
     {
@@ -287,7 +353,7 @@ const MenuManagement = () => {
       width: 100,
       renderCell: (params) => (
         <Switch
-          checked={params.value}
+          checked={Boolean(params.value)}
           onChange={(e) => handleAvailabilityToggle(params.row.id, e.target.checked)}
         />
       )
@@ -323,39 +389,76 @@ const MenuManagement = () => {
     },
   ];
 
-  const handleAvailabilityToggle = async (productId: number, isAvailable: boolean) => {
-    try {
-      // Update the availability in the backend
-      await menuAPI.updateProduct(productId, { is_available: isAvailable });
+  const handleAvailabilityToggle = async (productId: number, newAvailability: boolean) => {
+    console.log(`Изменение доступности товара ${productId} на ${newAvailability}`);
 
-      // Update the local state
+    try {
+      // Сохраняем старое состояние для отката
+      const oldProducts = [...products];
+
+      // Оптимистичное обновление UI
       setProducts(prevProducts =>
         prevProducts.map(product =>
-          product.id === productId ? { ...product, isAvailable } : product
+          product.id === productId ? { ...product, isAvailable: newAvailability } : product
         )
       );
+
+      // Пробуем все возможные варианты полей для отправки
+      const updateData: any = {};
+
+      // Пробуем все возможные поля для доступности
+      updateData.is_available = newAvailability;
+      updateData.isAvailable = newAvailability;
+      updateData.available = newAvailability;
+      updateData.status = newAvailability ? 'available' : 'unavailable';
+
+      console.log('Отправка данных обновления:', updateData);
+
+      // Отправляем запрос на сервер
+      await menuAPI.updateProduct(productId, updateData);
+
+      // Обновляем локальное состояние для синхронизации
+      // Перезагружаем данные продукта с сервера для проверки
+      try {
+        const response = await menuAPI.getProduct(productId);
+        const updatedProduct = response.data;
+        console.log('Обновленный продукт с сервера:', updatedProduct);
+
+        // Обновляем состояние с нормализованными данными
+        setProducts(prevProducts =>
+          prevProducts.map(product =>
+            product.id === productId ? normalizeProductData(updatedProduct) : product
+          )
+        );
+
+        console.log(`Доступность товара ${productId} успешно обновлена на ${newAvailability}`);
+      } catch (refreshError) {
+        console.warn('Не удалось загрузить обновленный продукт, но изменение сохранено');
+        // Если не удалось загрузить обновленный продукт, оставляем оптимистичное обновление
+      }
+
     } catch (error) {
       console.error('Error updating product availability:', error);
-      // Revert the change if the API call failed
-      setProducts(prevProducts =>
-        prevProducts.map(product =>
-          product.id === productId ? { ...product, isAvailable: !isAvailable } : product
-        )
-      );
+      // Откатываем изменения в UI
+      setProducts(oldProducts);
+      alert('Ошибка при обновлении доступности товара. Проверьте консоль для подробностей.');
     }
   };
 
   const handleEditProduct = (product: Product) => {
+    console.log('Редактирование продукта:', product);
+    console.log('category_id продукта:', product.category_id);
+
     setProductForm({
       id: product.id,
       name: product.name,
-      category: product.category_id?.toString() || product.category || '',
+      category: product.category_id?.toString() || '',
       price: product.price.toString(),
       costPrice: product.costPrice.toString(),
       isAvailable: product.isAvailable,
       stockQuantity: product.stockQuantity.toString(),
-      tags: product.tags || [],
-      description: product.description,
+      tags: Array.isArray(product.tags) ? product.tags : [],
+      description: product.description || '',
     });
     setOpenProductDialog(true);
   };
@@ -441,12 +544,15 @@ const MenuManagement = () => {
             }}
           >
             <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-              <ListItemText primary={category.name} secondary={
-                <>
-                  {category.description && <div>{category.description}</div>}
-                  {category.restaurant_name && <div>({category.restaurant_name})</div>}
-                </>
-              } />
+              <ListItemText
+                primary={category.name}
+                secondary={
+                  <Box component="div">
+                    {category.description && <div>{category.description}</div>}
+                    {category.restaurant_name && <div>({category.restaurant_name})</div>}
+                  </Box>
+                }
+              />
             </Box>
             <Box>
               <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleEditCategory(category); }}>
@@ -475,6 +581,17 @@ const MenuManagement = () => {
   };
 
   const handleAddProduct = () => {
+    setProductForm({
+      id: undefined,
+      name: '',
+      category: '',
+      price: '',
+      costPrice: '',
+      isAvailable: false,
+      stockQuantity: '',
+      tags: [],
+      description: '',
+    });
     setOpenProductDialog(true);
   };
 
@@ -510,6 +627,7 @@ const MenuManagement = () => {
 
   const handleCloseProductDialog = () => {
     setProductForm({
+      id: undefined,
       name: '',
       category: '',
       price: '',
@@ -581,7 +699,6 @@ const MenuManagement = () => {
     });
   };
 
-
   const handleOptionSwitchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setOptionForm({
       ...optionForm,
@@ -620,30 +737,32 @@ const MenuManagement = () => {
         return;
       }
 
-      const productData = {
+      const isEditing = Boolean(productForm.id);
+
+      const productData: any = {
         name: productForm.name,
-        category: productForm.category ? parseInt(productForm.category) : null,
-        description: productForm.description,
+        description: productForm.description || '',
         price: parseFloat(productForm.price) || 0,
         cost_price: parseFloat(productForm.costPrice) || 0,
         is_available: productForm.isAvailable,
         stock_quantity: parseInt(productForm.stockQuantity) || 0,
-        tags: productForm.tags,
+        tags: productForm.tags || [],
         restaurant: 1,
       };
 
+      // Добавляем категорию только если она выбрана
+      if (productForm.category) {
+        productData.category_id = parseInt(productForm.category);
+        productData.category = parseInt(productForm.category);
+      }
+
       console.log('Submitting product:', productData);
 
-      // Check if we're editing an existing product (this requires tracking if we're in edit mode)
-      // We'll need to track the editing state differently, so we'll need to update the state
-      const isEditing = Boolean(productForm.id); // Assuming we add an id field to productForm
-
-      if (isEditing) {
-        // Update existing product
-        await menuAPI.updateProduct(Number(productForm.id), productData);
+      let response;
+      if (isEditing && productForm.id) {
+        response = await menuAPI.updateProduct(productForm.id, productData);
       } else {
-        // Create new product
-        await menuAPI.createProduct(productData);
+        response = await menuAPI.createProduct(productData);
       }
 
       // Обновляем список продуктов
@@ -655,34 +774,16 @@ const MenuManagement = () => {
         productsArray = data;
       } else if (data && data.results && Array.isArray(data.results)) {
         productsArray = data.results;
+      } else if (data && data.data && Array.isArray(data.data)) {
+        productsArray = data.data;
+      } else if (data && data.products && Array.isArray(data.products)) {
+        productsArray = data.products;
       }
 
-      const transformedProducts = productsArray.map((product: any) => ({
-        id: product.id,
-        name: product.name || 'Без названия',
-        category: product.category_name || product.category?.name || String(product.category_id || product.category || 'Не указана'),
-        price: parseFloat(product.price) || 0,
-        costPrice: parseFloat(product.cost_price || product.costPrice) || 0,
-        isAvailable: product.is_available || product.isAvailable || false,
-        stockQuantity: product.stock_quantity || product.stockQuantity || 0,
-        orderCount: product.order_count || product.orderCount || 0,
-        tags: product.tags || [],
-        description: product.description || '',
-      }));
+      const transformedProducts = productsArray.map(normalizeProductData);
 
       setProducts(transformedProducts);
-      setOpenProductDialog(false);
-      setProductForm({
-        id: undefined,
-        name: '',
-        category: '',
-        price: '',
-        costPrice: '',
-        isAvailable: false,
-        stockQuantity: '',
-        tags: [],
-        description: '',
-      });
+      handleCloseProductDialog();
 
       console.log(isEditing ? 'Product updated successfully' : 'Product created successfully');
     } catch (error) {
@@ -971,7 +1072,7 @@ const MenuManagement = () => {
 
       {/* Product Dialog */}
       <Dialog open={openProductDialog} onClose={handleCloseProductDialog} maxWidth="md" fullWidth>
-        <DialogTitle>Добавить товар</DialogTitle>
+        <DialogTitle>{productForm.id ? 'Редактировать товар' : 'Добавить товар'}</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2 }}>
             <TextField
@@ -1022,6 +1123,9 @@ const MenuManagement = () => {
               value={productForm.price}
               onChange={handleProductFormChange}
               sx={{ mb: 2 }}
+              InputProps={{
+                endAdornment: <Typography color="textSecondary">₽</Typography>
+              }}
             />
             <TextField
               name="costPrice"
@@ -1033,6 +1137,9 @@ const MenuManagement = () => {
               value={productForm.costPrice}
               onChange={handleProductFormChange}
               sx={{ mb: 2 }}
+              InputProps={{
+                endAdornment: <Typography color="textSecondary">₽</Typography>
+              }}
             />
             <FormControlLabel
               control={
@@ -1089,7 +1196,7 @@ const MenuManagement = () => {
 
       {/* Category Dialog */}
       <Dialog open={openCategoryDialog} onClose={handleCloseCategoryDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>Добавить категорию</DialogTitle>
+        <DialogTitle>{categoryForm.id ? 'Редактировать категорию' : 'Добавить категорию'}</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2 }}>
             <TextField
@@ -1134,7 +1241,9 @@ const MenuManagement = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseCategoryDialog}>Отмена</Button>
-          <Button onClick={handleSubmitCategory} variant="contained">Создать</Button>
+          <Button onClick={handleSubmitCategory} variant="contained">
+            {categoryForm.id ? 'Сохранить' : 'Создать'}
+          </Button>
         </DialogActions>
       </Dialog>
 
