@@ -11,8 +11,8 @@ class Category(models.Model):
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255)
     description = models.TextField(blank=True)
-    image_url = models.URLField(blank=True)
-    icon_url = models.URLField(blank=True)
+    image_url = models.CharField(max_length=500, blank=True)  # Changed from URLField to CharField to support relative paths
+    icon_url = models.CharField(max_length=500, blank=True)  # Changed from URLField to CharField to support relative paths
 
     # Display settings
     display_order = models.IntegerField(default=0)
@@ -59,7 +59,7 @@ class Tag(models.Model):
     slug = models.SlugField(max_length=100)
     description = models.TextField(blank=True)
     color = models.CharField(max_length=7, blank=True)  # Hex color code
-    icon_url = models.URLField(blank=True)
+    icon_url = models.CharField(max_length=500, blank=True)  # Changed from URLField to CharField to support relative paths
 
     # Status
     is_active = models.BooleanField(default=True)
@@ -115,7 +115,7 @@ class Product(models.Model):
     carbohydrates = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)  # in grams
 
     # Media
-    main_image_url = models.URLField(null=True, blank=True)
+    main_image_url = models.CharField(max_length=500, null=True, blank=True)  # Changed from URLField to CharField to support relative paths
     image_urls = models.JSONField(default=list, blank=True)  # List of image URLs
     video_url = models.URLField(null=True, blank=True)
 

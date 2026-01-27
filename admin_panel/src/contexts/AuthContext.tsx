@@ -33,7 +33,7 @@ const logger = {
     console.warn(`[AUTH WARN] ${new Date().toISOString()}: ${message}`, data || '');
   },
   error: (message: string, error?: any) => {
-    console.error(`[AUTH ERROR] ${new Date().toISOString()}: ${message}`, error || '');
+    console.debug(`[AUTH DEBUG] ${new Date().toISOString()}: ${message}`, error || '');
   },
   debug: (message: string, data?: any) => {
     if (process.env.NODE_ENV === 'development') {

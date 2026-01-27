@@ -530,217 +530,192 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
   };
 
   const handleSubmitProduct = async () => {
-    try {
-      // Валидация формы
-      if (!productForm.name.trim()) {
-        showSnackbar('Пожалуйста, заполните название товара', 'error');
-        return;
-      }
+  try {
+    // Валидация формы
+    if (!productForm.name.trim()) {
+      showSnackbar('Пожалуйста, заполните название товара', 'error');
+      return;
+    }
 
-      if (!productForm.description.trim()) {
-        showSnackbar('Пожалуйста, заполните описание товара', 'error');
-        return;
-      }
+    if (!productForm.price || parseFloat(productForm.price) <= 0) {
+      showSnackbar('Пожалуйста, укажите корректную цену', 'error');
+      return;
+    }
 
-      if (!productForm.price || parseFloat(productForm.price) <= 0) {
-        showSnackbar('Пожалуйста, укажите корректную цену', 'error');
-        return;
-      }
+    const isEditing = Boolean(productForm.id);
 
-      const isEditing = Boolean(productForm.id);
+    // Создаем FormData для отправки данных с файлами
+    const formData = new FormData();
 
-      // Создаем базовый объект продукта
-      const productData: any = {
-        name: productForm.name.trim(),
-        description: productForm.description.trim(),
-        price: parseFloat(productForm.price) || 0,
-        is_available: productForm.isAvailable,
-        stock_quantity: parseInt(productForm.stockQuantity) || 0,
-        tags: productForm.tags || [],
-      };
+    // Добавляем текстовые поля
+    formData.append('name', productForm.name.trim());
+    formData.append('description', productForm.description.trim());
+    formData.append('price', parseFloat(productForm.price).toString());
+    formData.append('is_available', productForm.isAvailable.toString());
+    formData.append('stock_quantity', parseInt(productForm.stockQuantity).toString() || '0');
 
-      // Добавляем необязательные поля, если они заполнены
-      if (productForm.short_description.trim()) {
-        productData.short_description = productForm.short_description.trim();
-      }
+    // Добавляем необязательные поля
+    if (productForm.short_description.trim()) {
+      formData.append('short_description', productForm.short_description.trim());
+    }
 
-      if (productForm.old_price && parseFloat(productForm.old_price) > 0) {
-        productData.old_price = parseFloat(productForm.old_price);
-      }
+    if (productForm.old_price && parseFloat(productForm.old_price) > 0) {
+      formData.append('old_price', parseFloat(productForm.old_price).toString());
+    }
 
-      if (productForm.weight_grams) {
-        productData.weight_grams = parseInt(productForm.weight_grams);
-      }
+    if (productForm.weight_grams) {
+      formData.append('weight_grams', productForm.weight_grams);
+    }
 
-      if (productForm.calories) {
-        productData.calories = parseInt(productForm.calories);
-      }
+    if (productForm.calories) {
+      formData.append('calories', productForm.calories);
+    }
 
-      if (productForm.cooking_time_minutes) {
-        productData.cooking_time_minutes = parseInt(productForm.cooking_time_minutes);
-      }
+    if (productForm.cooking_time_minutes) {
+      formData.append('cooking_time_minutes', productForm.cooking_time_minutes);
+    }
 
-      // Флаги
-      productData.is_vegetarian = productForm.is_vegetarian;
-      productData.is_spicy = productForm.is_spicy;
-      productData.is_popular = productForm.is_popular;
-      productData.is_new = productForm.is_new;
+    // Флаги
+    formData.append('is_vegetarian', productForm.is_vegetarian.toString());
+    formData.append('is_spicy', productForm.is_spicy.toString());
+    formData.append('is_popular', productForm.is_popular.toString());
+    formData.append('is_new', productForm.is_new.toString());
 
-      // Категория - если выбрана
-      if (productForm.category) {
-        const categoryId = parseInt(productForm.category);
-        // Проверяем, существует ли такая категория
-        const categoryExists = categories.find(c => c.id === categoryId);
-        if (categoryExists) {
-          productData.category = categoryId; // Передаем ID категории
-        } else {
-          showSnackbar(`Категория с ID ${categoryId} не найдена. Выберите существующую категорию.`, 'error');
-          return;
-        }
-      }
-
-      console.log('Submitting product:', productData);
-
-      let productId: number;
-      let response;
-
-      // Сначала создаем/обновляем продукт
-      if (isEditing && productForm.id) {
-        response = await menuAPI.updateProduct(productForm.id, productData);
-        productId = productForm.id;
-      } else {
-        response = await menuAPI.createProduct(productData);
-        productId = response.data.id;
-      }
-
-      console.log('Server response:', response);
-
-      // Если успешно создали/обновили
-      if (response.status >= 200 && response.status < 300) {
-        // Затем обновляем изображения, если они есть
-        if (productImages.length > 0) {
-          setUploadingImages(true);
-          try {
-            await updateProductWithImages(productId, productData);
-          } catch (uploadError: any) {
-            console.error('Error uploading images:', uploadError);
-            // Не показываем ошибку пользователю, только в консоль
-            // Товар уже сохранен, изображения можно загрузить позже
-          } finally {
-            setUploadingImages(false);
-          }
-        }
-
-        // Обновляем список продуктов
-        try {
-          const productsRes = await menuAPI.getProducts();
-          const data = productsRes.data;
-
-          let productsArray: any[] = [];
-          if (Array.isArray(data)) {
-            productsArray = data;
-          } else if (data && data.results && Array.isArray(data.results)) {
-            productsArray = data.results;
-          } else if (data && data.data && Array.isArray(data.data)) {
-            productsArray = data.data;
-          }
-
-          const transformedProducts = productsArray.map((product: any) => {
-            const price = parseFloat(product.price) || 0;
-            const oldPrice = parseFloat(product.old_price) || null;
-            const isAvailable = Boolean(
-              product.in_stock ??
-              product.is_available ??
-              product.isAvailable ??
-              product.available ??
-              product.status === 'available' ??
-              false
-            );
-
-            const categoryId = product.category?.id || product.category_id || product.categoryId || null;
-            const categoryName = categories.find(c => c.id === categoryId)?.name ||
-                               product.category?.name ||
-                               product.category_name ||
-                               product.category ||
-                               'Не указана';
-
-            return {
-              id: product.id,
-              name: product.name || 'Без названия',
-              category: categoryName,
-              category_id: categoryId,
-              category_name: categoryName,
-              price: price,
-              old_price: oldPrice,
-              costPrice: product.cost_price || 0,
-              isAvailable: isAvailable,
-              stockQuantity: product.stock_quantity || product.stockQuantity || 0,
-              orderCount: product.order_count || product.orderCount || 0,
-              tags: Array.isArray(product.tags) ? product.tags : [],
-              description: product.description || '',
-              short_description: product.short_description || '',
-              main_image_url: product.main_image_url || '',
-              image_urls: product.image_urls || [],
-              weight_grams: product.weight_grams || null,
-              calories: product.calories || null,
-              cooking_time_minutes: product.cooking_time_minutes || null,
-              is_vegetarian: product.is_vegetarian || false,
-              is_spicy: product.is_spicy || false,
-              is_popular: product.is_popular || false,
-              is_new: product.is_new || false,
-            };
-          });
-
-          onUpdateProducts(transformedProducts);
-          handleCloseProductDialog();
-
-          showSnackbar(
-            isEditing ? 'Товар успешно обновлен' : 'Товар успешно создан',
-            'success'
-          );
-          console.log(isEditing ? 'Product updated successfully' : 'Product created successfully');
-        } catch (refreshError) {
-          console.error('Error refreshing products list:', refreshError);
-          showSnackbar('Товар сохранен, но возникла ошибка при обновлении списка', 'warning');
-        }
-      } else {
-        throw new Error(`Server returned status ${response.status}`);
-      }
-    } catch (error: any) {
-      console.error('Error creating/updating product:', error);
-
-      // Подробная информация об ошибке
-      if (error.response?.data) {
-        console.error('Server error details:', error.response.data);
-
-        // Показываем детали ошибки пользователю
-        let errorMessage = 'Ошибка при сохранении товара:\n';
-
-        if (error.response.data.detail) {
-          errorMessage += error.response.data.detail;
-        } else if (typeof error.response.data === 'object') {
-          // Парсим ошибки валидации Django
-          Object.keys(error.response.data).forEach(key => {
-            if (Array.isArray(error.response.data[key])) {
-              errorMessage += `${key}: ${error.response.data[key].join(', ')}\n`;
-            } else {
-              errorMessage += `${key}: ${error.response.data[key]}\n`;
-            }
-          });
-        } else if (typeof error.response.data === 'string') {
-          errorMessage += error.response.data;
-        } else {
-          errorMessage += JSON.stringify(error.response.data);
-        }
-
-        showSnackbar(errorMessage, 'error');
-      } else if (error.message) {
-        showSnackbar(`Ошибка: ${error.message}`, 'error');
-      } else {
-        showSnackbar('Ошибка при сохранении товара', 'error');
+    // Категория
+    if (productForm.category) {
+      const categoryId = parseInt(productForm.category);
+      const categoryExists = categories.find(c => c.id === categoryId);
+      if (categoryExists) {
+        formData.append('category', categoryId.toString());
       }
     }
-  };
+
+    // Добавляем изображения
+    productImages.forEach((image, index) => {
+      if (image.file) {
+        if (image.isMain) {
+          formData.append('main_image', image.file);
+        } else {
+          formData.append('image_urls', image.file);
+        }
+      }
+    });
+
+    console.log('Submitting product with FormData');
+
+    let response;
+    let productId: number;
+
+    // Создаем или обновляем товар
+    if (isEditing && productForm.id) {
+      response = await menuAPI.updateProduct(productForm.id, formData);
+      productId = productForm.id;
+    } else {
+      response = await menuAPI.createProduct(formData);
+      productId = response.data.id;
+    }
+
+    console.log('Server response:', response);
+
+    // Обновляем список продуктов
+    try {
+      const productsRes = await menuAPI.getProducts();
+      const data = productsRes.data;
+
+      let productsArray: any[] = [];
+      if (Array.isArray(data)) {
+        productsArray = data;
+      } else if (data && data.results && Array.isArray(data.results)) {
+        productsArray = data.results;
+      } else if (data && data.data && Array.isArray(data.data)) {
+        productsArray = data.data;
+      }
+
+      const transformedProducts = productsArray.map((product: any) => {
+        const price = parseFloat(product.price) || 0;
+        const oldPrice = parseFloat(product.old_price) || null;
+        const isAvailable = Boolean(product.is_available ?? true);
+
+        const categoryId = product.category?.id || product.category_id || null;
+        const categoryName = categories.find(c => c.id === categoryId)?.name ||
+                           product.category?.name ||
+                           product.category_name ||
+                           product.category ||
+                           'Не указана';
+
+        return {
+          id: product.id,
+          name: product.name || 'Без названия',
+          category: categoryName,
+          category_id: categoryId,
+          category_name: categoryName,
+          price: price,
+          old_price: oldPrice,
+          costPrice: product.cost_price || 0,
+          isAvailable: isAvailable,
+          stockQuantity: product.stock_quantity || 0,
+          orderCount: product.order_count || 0,
+          tags: Array.isArray(product.tags) ? product.tags : [],
+          description: product.description || '',
+          short_description: product.short_description || '',
+          main_image_url: product.main_image_url || '',
+          image_urls: product.image_urls || [],
+          weight_grams: product.weight_grams || null,
+          calories: product.calories || null,
+          cooking_time_minutes: product.cooking_time_minutes || null,
+          is_vegetarian: product.is_vegetarian || false,
+          is_spicy: product.is_spicy || false,
+          is_popular: product.is_popular || false,
+          is_new: product.is_new || false,
+        };
+      });
+
+      onUpdateProducts(transformedProducts);
+      handleCloseProductDialog();
+
+      showSnackbar(
+        isEditing ? 'Товар успешно обновлен' : 'Товар успешно создан',
+        'success'
+      );
+
+    } catch (refreshError) {
+      console.error('Error refreshing products list:', refreshError);
+      showSnackbar('Товар сохранен, но возникла ошибка при обновлении списка', 'warning');
+    }
+
+  } catch (error: any) {
+    console.error('Error creating/updating product:', error);
+
+    // Подробная информация об ошибке
+    if (error.response?.data) {
+      console.error('Server error details:', error.response.data);
+
+      let errorMessage = 'Ошибка при сохранении товара:\n';
+
+      if (error.response.data.detail) {
+        errorMessage += error.response.data.detail;
+      } else if (typeof error.response.data === 'object') {
+        Object.keys(error.response.data).forEach(key => {
+          if (Array.isArray(error.response.data[key])) {
+            errorMessage += `${key}: ${error.response.data[key].join(', ')}\n`;
+          } else {
+            errorMessage += `${key}: ${error.response.data[key]}\n`;
+          }
+        });
+      } else if (typeof error.response.data === 'string') {
+        errorMessage += error.response.data;
+      } else {
+        errorMessage += JSON.stringify(error.response.data);
+      }
+
+      showSnackbar(errorMessage, 'error');
+    } else if (error.message) {
+      showSnackbar(`Ошибка: ${error.message}`, 'error');
+    } else {
+      showSnackbar('Ошибка при сохранении товара', 'error');
+    }
+  }
+};
 
   return (
     <Box>

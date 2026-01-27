@@ -137,19 +137,95 @@ class OptionValueSerializer(serializers.ModelSerializer):
 
 
 class ProductCreateUpdateSerializer(serializers.ModelSerializer):
+    main_image = serializers.ImageField(required=False, allow_null=True)
+    additional_images = serializers.ListField(
+        child=serializers.ImageField(),
+        required=False,
+        allow_empty=True
+    )
+
     class Meta:
         model = Product
         fields = [
             'id', 'name', 'description', 'short_description', 'price',
             'old_price', 'cost_price', 'category', 'restaurant',
             'weight_grams', 'volume_ml', 'calories', 'proteins', 'fats', 'carbohydrates',
-            'main_image_url', 'image_urls', 'video_url', 'is_available',
+            'main_image', 'additional_images', 'video_url', 'is_available',
             'stock_quantity', 'is_unlimited_stock', 'low_stock_threshold',
             'is_popular', 'is_new', 'is_recommended', 'is_spicy', 'is_vegetarian',
             'is_vegan', 'is_gluten_free', 'cooking_time_minutes', 'preparation_instructions',
             'display_order', 'seo_title', 'seo_description', 'seo_keywords',
             'custom_attributes'
         ]
+        read_only_fields = ['id', 'main_image_url', 'image_urls']
+
+    def create(self, validated_data):
+        # Извлекаем файлы изображений
+        main_image = validated_data.pop('main_image', None)
+        additional_images = validated_data.pop('additional_images', [])
+
+        # Создаем продукт
+        product = Product.objects.create(**validated_data)
+
+        # Сохраняем основное изображение
+        if main_image:
+            product.main_image_url = self.save_image(main_image, product, 'main')
+            product.save()
+
+        # Сохраняем дополнительные изображения
+        if additional_images:
+            image_urls = []
+            for img in additional_images:
+                url = self.save_image(img, product, 'additional')
+                image_urls.append(url)
+            product.image_urls = image_urls
+            product.save()
+
+        return product
+
+    def update(self, instance, validated_data):
+        # Извлекаем файлы изображений
+        main_image = validated_data.pop('main_image', None)
+        additional_images = validated_data.pop('additional_images', [])
+
+        # Обновляем остальные поля
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        # Обновляем основное изображение если предоставлено
+        if main_image is not None:
+            if main_image:  # Новое изображение
+                instance.main_image_url = self.save_image(main_image, instance, 'main')
+            else:  # None - удаляем изображение
+                instance.main_image_url = None
+
+        # Обновляем дополнительные изображения если предоставлены
+        if additional_images is not None:
+            image_urls = []
+            for img in additional_images:
+                url = self.save_image(img, instance, 'additional')
+                image_urls.append(url)
+            instance.image_urls = image_urls
+
+        instance.save()
+        return instance
+
+    def save_image(self, image_file, product, image_type='additional'):
+        """Сохраняет изображение и возвращает URL"""
+        import os
+        from django.core.files.storage import default_storage
+        from django.utils.timezone import now
+
+        # Генерируем уникальное имя файла
+        timestamp = now().strftime('%Y%m%d_%H%M%S')
+        ext = os.path.splitext(image_file.name)[1]
+        filename = f'{image_type}_{timestamp}_{product.id}{ext}'
+
+        # Сохраняем файл
+        file_path = default_storage.save(f'products/{product.id}/{filename}', image_file)
+
+        # Возвращаем URL
+        return f'/media/{file_path}'
 
 
 class ProductSerializer(serializers.ModelSerializer):
