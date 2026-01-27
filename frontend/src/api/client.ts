@@ -1,3 +1,4 @@
+
 import { ApiResponse } from '../types';
 
 const API_BASE_URL = 'http://localhost:8000/api';
@@ -228,12 +229,50 @@ class ApiClient {
   }
 
   // Categories
-  async getCategories(restaurantId: string) {
-    return this.request<{
-      restaurant: any;
-      categories: any[];
-      products: any[];
-    }>(`/restaurants/${restaurantId}/menu/`);
+  async getCategories(restaurantId?: string) {
+    if (restaurantId) {
+      return this.request<{
+        restaurant: any;
+        categories: any[];
+        products: any[];
+      }>(`/restaurants/${restaurantId}/menu/`);
+    } else {
+      // Return all categories and products for non-restaurant specific menu
+      const categoriesResponse = await this.request('/categories/');
+      const productsResponse = await this.request('/products/');
+
+      if (categoriesResponse.success && productsResponse.success) {
+        // Extract the actual arrays from the response data
+        // The API might return the arrays directly or inside a nested property
+        const categories = Array.isArray(categoriesResponse.data)
+          ? categoriesResponse.data
+          : (categoriesResponse.data as any)?.results || (categoriesResponse.data as any)?.categories || [];
+
+        const products = Array.isArray(productsResponse.data)
+          ? productsResponse.data
+          : (productsResponse.data as any)?.results || (productsResponse.data as any)?.products || [];
+
+        // Create a mock restaurant object to maintain consistency with the expected structure
+        return {
+          success: true,
+          data: {
+            restaurant: { id: 'all', name: 'All Restaurants' },
+            categories: categories,
+            products: products
+          }
+        };
+      } else {
+        return {
+          success: false,
+          error: categoriesResponse.error || productsResponse.error || 'Failed to load menu data'
+        };
+      }
+    }
+  }
+
+  // Get all products
+  async getAllProducts() {
+    return this.request('/products/');
   }
 
   // Products
@@ -344,4 +383,3 @@ class ApiClient {
 }
 
 export const apiClient = new ApiClient();
-
