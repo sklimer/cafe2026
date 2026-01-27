@@ -196,8 +196,8 @@ const MenuManagement = () => {
             id: product.id,
             name: product.name || 'Без названия',
             category: product.category_name || product.category?.name || String(product.category_id || product.category || 'Не указана'),
-            price: product.price || 0,
-            costPrice: product.cost_price || product.costPrice || 0,
+            price: parseFloat(product.price) || 0,
+            costPrice: parseFloat(product.cost_price || product.costPrice) || 0,
             isAvailable: product.is_available || product.isAvailable || false,
             stockQuantity: product.stock_quantity || product.stockQuantity || 0,
             orderCount: product.order_count || product.orderCount || 0,
@@ -347,6 +347,7 @@ const MenuManagement = () => {
 
   const handleEditProduct = (product: Product) => {
     setProductForm({
+      id: product.id,
       name: product.name,
       category: product.category_id?.toString() || product.category || '',
       price: product.price.toString(),
@@ -439,8 +440,13 @@ const MenuManagement = () => {
               alignItems: 'center'
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-              <ListItemText primary={category.name} secondary={category.restaurant_name ? `(${category.restaurant_name})` : ''} />
+            <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+              <ListItemText primary={category.name} secondary={
+                <>
+                  {category.description && <div>{category.description}</div>}
+                  {category.restaurant_name && <div>({category.restaurant_name})</div>}
+                </>
+              } />
             </Box>
             <Box>
               <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleEditCategory(category); }}>
@@ -575,12 +581,6 @@ const MenuManagement = () => {
     });
   };
 
-  const handleSwitchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setProductForm({
-      ...productForm,
-      isAvailable: e.target.checked,
-    });
-  };
 
   const handleOptionSwitchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setOptionForm({
@@ -661,8 +661,8 @@ const MenuManagement = () => {
         id: product.id,
         name: product.name || 'Без названия',
         category: product.category_name || product.category?.name || String(product.category_id || product.category || 'Не указана'),
-        price: product.price || 0,
-        costPrice: product.cost_price || product.costPrice || 0,
+        price: parseFloat(product.price) || 0,
+        costPrice: parseFloat(product.cost_price || product.costPrice) || 0,
         isAvailable: product.is_available || product.isAvailable || false,
         stockQuantity: product.stock_quantity || product.stockQuantity || 0,
         orderCount: product.order_count || product.orderCount || 0,
@@ -1038,7 +1038,7 @@ const MenuManagement = () => {
               control={
                 <Switch
                   checked={productForm.isAvailable}
-                  onChange={handleSwitchChange}
+                  onChange={(e) => setProductForm({...productForm, isAvailable: e.target.checked})}
                 />
               }
               label="Доступен"
@@ -1081,7 +1081,9 @@ const MenuManagement = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseProductDialog}>Отмена</Button>
-          <Button onClick={handleSubmitProduct} variant="contained">Создать</Button>
+          <Button onClick={handleSubmitProduct} variant="contained">
+            {productForm.id ? 'Сохранить' : 'Создать'}
+          </Button>
         </DialogActions>
       </Dialog>
 
