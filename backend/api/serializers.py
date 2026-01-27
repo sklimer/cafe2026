@@ -230,7 +230,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
 
 class ProductSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', allow_null=True)
-    restaurant_name = serializers.CharField(source='restaurant.name')
+    restaurant_name = serializers.CharField(source='restaurant.name', allow_null=True)
     tags = TagSerializer(many=True, read_only=True)
     options = serializers.SerializerMethodField()
     in_stock = serializers.SerializerMethodField()
