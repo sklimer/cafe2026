@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -47,18 +48,24 @@ interface Category {
   parent?: number | null;
   level?: number;
   restaurant?: number;
+  restaurant_name?: string;
   description?: string;
   image_url?: string;
   icon_url?: string;
   children?: Category[];
+  is_active?: boolean;
+  is_visible?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface Product {
   id: number;
   name: string;
   category: string;
-  price: number;
-  costPrice: number;
+  category_id?: number;
+  price: number | string;  // Price can come as string from API
+  costPrice: number | string;  // Cost price can come as string from API
   isAvailable: boolean;
   stockQuantity: number;
   orderCount: number;
@@ -90,13 +97,17 @@ const MenuManagement = () => {
 
   // Состояния для формы категории
   const [categoryForm, setCategoryForm] = useState({
+    id: null as number | null,
     name: '',
     parentId: '',
     description: '',
+    is_active: true,
+    is_visible: true,
   });
 
   // Состояния для формы продукта
   const [productForm, setProductForm] = useState({
+    id: undefined as number | undefined,
     name: '',
     category: '',
     price: '',
@@ -256,20 +267,29 @@ const MenuManagement = () => {
       field: 'price',
       headerName: 'Цена',
       width: 100,
-      valueFormatter: (params) => `${params.value}₽`
+      valueFormatter: (params) => {
+        const price = typeof params.value === 'number' ? params.value : parseFloat(params.value) || 0;
+        return `${price.toLocaleString('ru-RU')}₽`;
+      }
     },
     {
       field: 'costPrice',
       headerName: 'Себестоимость',
       width: 150,
-      valueFormatter: (params) => `${params.value}₽`
+      valueFormatter: (params) => {
+        const costPrice = typeof params.value === 'number' ? params.value : parseFloat(params.value) || 0;
+        return `${costPrice.toLocaleString('ru-RU')}₽`;
+      }
     },
     {
       field: 'isAvailable',
       headerName: 'Доступен',
       width: 100,
       renderCell: (params) => (
-        <Switch checked={params.value} />
+        <Switch
+          checked={params.value}
+          onChange={(e) => handleAvailabilityToggle(params.row.id, e.target.checked)}
+        />
       )
     },
     { field: 'stockQuantity', headerName: 'Остаток', width: 100 },
@@ -292,10 +312,10 @@ const MenuManagement = () => {
       width: 120,
       renderCell: (params) => (
         <Box>
-          <IconButton size="small" onClick={() => console.log('Edit', params.row.id)}>
+          <IconButton size="small" onClick={() => handleEditProduct(params.row)}>
             <EditIcon />
           </IconButton>
-          <IconButton size="small" onClick={() => console.log('Delete', params.row.id)}>
+          <IconButton size="small" onClick={() => handleDeleteProduct(params.row.id)}>
             <DeleteIcon />
           </IconButton>
         </Box>
@@ -303,12 +323,92 @@ const MenuManagement = () => {
     },
   ];
 
+  const handleAvailabilityToggle = async (productId: number, isAvailable: boolean) => {
+    try {
+      // Update the availability in the backend
+      await menuAPI.updateProduct(productId, { is_available: isAvailable });
+
+      // Update the local state
+      setProducts(prevProducts =>
+        prevProducts.map(product =>
+          product.id === productId ? { ...product, isAvailable } : product
+        )
+      );
+    } catch (error) {
+      console.error('Error updating product availability:', error);
+      // Revert the change if the API call failed
+      setProducts(prevProducts =>
+        prevProducts.map(product =>
+          product.id === productId ? { ...product, isAvailable: !isAvailable } : product
+        )
+      );
+    }
+  };
+
+  const handleEditProduct = (product: Product) => {
+    setProductForm({
+      name: product.name,
+      category: product.category_id?.toString() || product.category || '',
+      price: product.price.toString(),
+      costPrice: product.costPrice.toString(),
+      isAvailable: product.isAvailable,
+      stockQuantity: product.stockQuantity.toString(),
+      tags: product.tags || [],
+      description: product.description,
+    });
+    setOpenProductDialog(true);
+  };
+
+  const handleDeleteProduct = async (productId: number) => {
+    if (window.confirm('Вы уверены, что хотите удалить этот товар?')) {
+      try {
+        await menuAPI.deleteProduct(productId);
+
+        // Update the local state
+        setProducts(prevProducts =>
+          prevProducts.filter(product => product.id !== productId)
+        );
+      } catch (error) {
+        console.error('Error deleting product:', error);
+        alert('Ошибка при удалении товара');
+      }
+    }
+  };
+
   const toggleCategory = (id: number) => {
     setExpandedCategories(prev =>
       prev.includes(id)
         ? prev.filter(catId => catId !== id)
         : [...prev, id]
     );
+  };
+
+  const handleEditCategory = (category: Category) => {
+    setCategoryForm({
+      id: category.id,
+      name: category.name,
+      parentId: category.parent?.toString() || '',
+      description: category.description || '',
+      is_active: category.is_active ?? true,
+      is_visible: category.is_visible ?? true,
+    });
+    setOpenCategoryDialog(true);
+  };
+
+  const handleDeleteCategory = async (categoryId: number) => {
+    if (window.confirm('Вы уверены, что хотите удалить эту категорию?')) {
+      try {
+        await menuAPI.deleteCategory(categoryId);
+
+        // Update the local state
+        setCategories(prevCategories =>
+          prevCategories.filter(category => category.id !== categoryId)
+        );
+      } catch (error) {
+        console.error('Error deleting category:', error);
+        alert('Ошибка при удалении категории');
+      }
+    }
   };
 
   // Функция для отображения дерева категорий
@@ -339,7 +439,17 @@ const MenuManagement = () => {
               alignItems: 'center'
             }}
           >
-            <ListItemText primary={category.name} />
+            <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+              <ListItemText primary={category.name} secondary={category.restaurant_name ? `(${category.restaurant_name})` : ''} />
+            </Box>
+            <Box>
+              <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleEditCategory(category); }}>
+                <EditIcon fontSize="small" />
+              </IconButton>
+              <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleDeleteCategory(category.id); }}>
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Box>
             {hasChildren ? (
               expandedCategories.includes(category.id) ?
                 <ExpandLess /> :
@@ -364,9 +474,12 @@ const MenuManagement = () => {
 
   const handleAddCategory = () => {
     setCategoryForm({
+      id: null,
       name: '',
       parentId: '',
       description: '',
+      is_active: true,
+      is_visible: true,
     });
     setOpenCategoryDialog(true);
   };
@@ -520,7 +633,18 @@ const MenuManagement = () => {
       };
 
       console.log('Submitting product:', productData);
-      await menuAPI.createProduct(productData);
+
+      // Check if we're editing an existing product (this requires tracking if we're in edit mode)
+      // We'll need to track the editing state differently, so we'll need to update the state
+      const isEditing = Boolean(productForm.id); // Assuming we add an id field to productForm
+
+      if (isEditing) {
+        // Update existing product
+        await menuAPI.updateProduct(Number(productForm.id), productData);
+      } else {
+        // Create new product
+        await menuAPI.createProduct(productData);
+      }
 
       // Обновляем список продуктов
       const productsRes = await menuAPI.getProducts();
@@ -549,6 +673,7 @@ const MenuManagement = () => {
       setProducts(transformedProducts);
       setOpenProductDialog(false);
       setProductForm({
+        id: undefined,
         name: '',
         category: '',
         price: '',
@@ -559,10 +684,10 @@ const MenuManagement = () => {
         description: '',
       });
 
-      console.log('Product created successfully');
+      console.log(isEditing ? 'Product updated successfully' : 'Product created successfully');
     } catch (error) {
-      console.error('Error creating product:', error);
-      alert('Ошибка при создании товара');
+      console.error('Error creating/updating product:', error);
+      alert('Ошибка при сохранении товара');
     }
   };
 
@@ -577,10 +702,19 @@ const MenuManagement = () => {
         name: categoryForm.name,
         parent: categoryForm.parentId ? parseInt(categoryForm.parentId) : null,
         description: categoryForm.description || '',
+        is_active: categoryForm.is_active,
+        is_visible: categoryForm.is_visible,
       };
 
       console.log('Submitting category:', categoryData);
-      await menuAPI.createCategory(categoryData);
+
+      if (categoryForm.id) {
+        // Update existing category
+        await menuAPI.updateCategory(categoryForm.id, categoryData);
+      } else {
+        // Create new category
+        await menuAPI.createCategory(categoryData);
+      }
 
       // Обновляем список категорий
       const categoriesRes = await menuAPI.getCategories();
@@ -596,15 +730,18 @@ const MenuManagement = () => {
       setCategories(categoriesArray);
       setOpenCategoryDialog(false);
       setCategoryForm({
+        id: null,
         name: '',
         parentId: '',
         description: '',
+        is_active: true,
+        is_visible: true,
       });
 
-      console.log('Category created successfully');
+      console.log(categoryForm.id ? 'Category updated successfully' : 'Category created successfully');
     } catch (error) {
-      console.error('Error creating category:', error);
-      alert('Ошибка при создании категории');
+      console.error(categoryForm.id ? 'Error updating category:' : 'Error creating category:', error);
+      alert(categoryForm.id ? 'Ошибка при обновлении категории' : 'Ошибка при создании категории');
     }
   };
 

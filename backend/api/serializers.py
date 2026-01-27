@@ -186,6 +186,24 @@ class ProductSerializer(serializers.ModelSerializer):
         return obj.stock_quantity > 0
 
 
+class CategoryWithChildrenSerializer(serializers.ModelSerializer):
+    """Serializer for category with children for hierarchical display"""
+    children = serializers.SerializerMethodField()
+    restaurant_name = serializers.CharField(source='restaurant.name', allow_null=True)
+
+    class Meta:
+        model = Category
+        fields = ['id', 'name', 'description', 'image_url', 'icon_url',
+                 'display_order', 'is_active', 'is_visible', 'restaurant', 'restaurant_name', 'created_at', 'updated_at', 'children']
+
+    def get_children(self, obj):
+        # Get children categories recursively
+        children = Category.objects.filter(parent=obj, is_active=True, is_visible=True)
+        if children.exists():
+            return CategoryWithChildrenSerializer(children, many=True, context=self.context).data
+        return []
+
+
 class CategorySerializer(serializers.ModelSerializer):
     restaurant = serializers.PrimaryKeyRelatedField(queryset=Restaurant.objects.all(), required=False)
 

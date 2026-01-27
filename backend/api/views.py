@@ -346,6 +346,16 @@ class CategoryViewSet(viewsets.ModelViewSet):
     filterset_fields = ['restaurant', 'parent', 'is_active', 'is_visible']
     ordering_fields = ['display_order', 'name']
 
+    def get_serializer_class(self):
+        """
+        Use different serializers for different actions
+        """
+        # Use hierarchical serializer for list view in admin panel
+        if self.action == 'list':
+            from .serializers import CategoryWithChildrenSerializer
+            return CategoryWithChildrenSerializer
+        return CategorySerializer
+
     def get_permissions(self):
         """
         Instantiates and returns the list of permissions that this view requires.
