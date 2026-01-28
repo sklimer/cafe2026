@@ -47,8 +47,7 @@ const CartProductImage: React.FC<{
 
 const CartPage: React.FC = () => {
   const navigate = useNavigate();
-  const { items, subtotal, clearCart, removeItem, updateQuantity } = useCartStore();
-  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+  const { items, subtotal, totalItems, clearCart, removeItem, updateQuantity } = useCartStore();
   const [isTelegramReady, setIsTelegramReady] = useState(false);
 
   const handleCheckout = () => {
@@ -279,7 +278,7 @@ const CartPage: React.FC = () => {
         <Container className="px-3 py-3">
           <div className="row align-items-center">
             <div className="col">
-              <div className="small text-muted">Товаров: {totalItems}</div>
+              <div className="small text-muted">Товаров: {getTotalItems()}</div>
               <div className="h4 fw-bold text-dark mb-0">
                 {Number(subtotal).toFixed(0)} ₽
               </div>

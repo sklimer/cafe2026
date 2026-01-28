@@ -14,21 +14,53 @@ interface CartState {
   clearCart: () => void;
 
   // Getters
-  totalItems: number;
+  totalItems: () => number;
   itemCount: (productId: string) => number;
   isSameRestaurant: (restaurantId: string) => boolean;
+
+  // Helper function
+  removeItemFromState: (state: CartState, itemId: string) => CartState;
 }
 
-export const useCartStore = create<CartState>((set, get) => ({
+// Функции для работы с localStorage
+const loadCartFromStorage = (): CartState | null => {
+  try {
+    const stored = localStorage.getItem('cart');
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.error('Error loading cart from storage:', error);
+  }
+  return null;
+};
+
+const saveCartToStorage = (state: CartState) => {
+  try {
+    localStorage.setItem('cart', JSON.stringify({
+      items: state.items,
+      restaurantId: state.restaurantId,
+      subtotal: state.subtotal
+    }));
+  } catch (error) {
+    console.error('Error saving cart to storage:', error);
+  }
+};
+
+const initialState = loadCartFromStorage() || {
   items: [],
   restaurantId: null,
   subtotal: 0,
+};
+
+export const useCartStore = create<CartState>((set, get) => ({
+  ...initialState,
 
   addItem: (product, quantity, options) => set((state) => {
     // Проверяем, совпадает ли ресторан
     if (state.restaurantId && state.restaurantId !== product.restaurantId) {
       // Если нет, очищаем корзину перед добавлением
-      return {
+      const newState = {
         ...state,
         items: [{
           id: `${product.id}_${Date.now()}`,
@@ -41,6 +73,8 @@ export const useCartStore = create<CartState>((set, get) => ({
         restaurantId: product.restaurantId,
         subtotal: Number(calculateItemPrice(product, options)) * quantity
       };
+      saveCartToStorage(newState); // Сохраняем в localStorage
+      return newState;
     }
 
     // Проверяем, есть ли уже такой товар с такими же опциями
@@ -69,12 +103,14 @@ export const useCartStore = create<CartState>((set, get) => ({
       });
     }
 
-    return {
+    const newState = {
       ...state,
       items: newItems,
       restaurantId: state.restaurantId || product.restaurantId,
       subtotal: newItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
     };
+    saveCartToStorage(newState); // Сохраняем в localStorage
+    return newState;
   }),
 
   updateQuantity: (itemId, quantity) => set((state) => {
@@ -86,27 +122,31 @@ export const useCartStore = create<CartState>((set, get) => ({
       item.id === itemId ? { ...item, quantity } : item
     );
 
-    return {
+    const newState = {
       ...state,
       items: updatedItems,
       subtotal: updatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
     };
+    saveCartToStorage(newState); // Сохраняем в localStorage
+    return newState;
   }),
 
-  removeItem: (itemId) => set((state) => get().removeItemFromState(state, itemId)),
+  removeItem: (itemId) => set((state) => {
+    const newState = get().removeItemFromState(state, itemId);
+    saveCartToStorage(newState); // Сохраняем в localStorage
+    return newState;
+  }),
 
-  clearCart: () => set({ items: [], restaurantId: null, subtotal: 0 }),
+  clearCart: () => {
+    const newState = { items: [], restaurantId: null, subtotal: 0 };
+    saveCartToStorage(newState); // Сохраняем в localStorage
+    set(newState);
+  },
 
   // Computed properties
-  get totalItems() {
-    return this.items.reduce((sum, item) => sum + item.quantity, 0);
-  },
+  totalItems: 0, // Will be calculated dynamically in the getter below
 
-  itemCount: (productId: string) => {
-    return this.items
-      .filter(item => item.productId === productId)
-      .reduce((sum, item) => sum + item.quantity, 0);
-  },
+  itemCount: (productId: string) => 0, // Will be calculated dynamically in the getter below
 
   isSameRestaurant: (restaurantId: string) => {
     return this.restaurantId === restaurantId;
@@ -115,11 +155,24 @@ export const useCartStore = create<CartState>((set, get) => ({
   // Вспомогательная функция для удаления элемента
   removeItemFromState: (state, itemId) => {
     const filteredItems = state.items.filter(item => item.id !== itemId);
-    return {
+    const newState = {
       ...state,
       items: filteredItems,
       subtotal: filteredItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
     };
+    return newState;
+  }
+}), (set, get) => ({
+  // Computed getters
+  totalItems: () => {
+    const state = get();
+    return state.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
+  },
+
+  itemCount: (productId: string) => {
+    const state = get();
+    return state.items?.filter(item => item.productId === productId)
+      .reduce((sum, item) => sum + item.quantity, 0) ?? 0;
   }
 }));
 

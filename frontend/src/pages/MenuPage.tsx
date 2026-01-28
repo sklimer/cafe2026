@@ -7,6 +7,9 @@ import { apiClient, getFullImageUrl } from '../api/client';
 import { useQuery } from '@tanstack/react-query';
 import { Container, Row, Col } from 'react-bootstrap';
 
+
+
+
 // Вспомогательная функция для безопасного доступа к тегам
 const getProductTags = (product: any): any[] => {
   if (!product) return [];
@@ -91,8 +94,7 @@ const ProductImage: React.FC<{ src: string | null; alt: string }> = ({ src, alt 
 
 const ChatBurgerMenu: React.FC = () => {
   const navigate = useNavigate();
-  const { addItem, subtotal, items } = useCartStore();
-  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+  const { addItem, subtotal, items, totalItems } = useCartStore();
   const headerRef = useRef<HTMLDivElement>(null);
   const categoriesRef = useRef<HTMLDivElement>(null);
   const prevScrollY = useRef(0);
@@ -435,23 +437,52 @@ const ChatBurgerMenu: React.FC = () => {
         )}
       </Container>
 
-      {/* Фиксированная кнопка корзины - компактная, синяя, с закруглением */}
-      <div className="fixed-bottom px-3 py-2" style={{ height: '50px' }}>
-        <button
-          className={`btn w-100 h-100 d-flex align-items-center justify-content-center rounded-3 shadow ${totalItems === 0 ? 'opacity-75' : ''}`}
-          onClick={() => totalItems > 0 && navigate('/cart')}
-          disabled={totalItems === 0}
-          style={{
-            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-            color: 'white',
-            fontSize: '16px',
-            fontWeight: '600',
-            border: 'none'
-          }}
-        >
-          <span>Корзина {Number(subtotal).toFixed(0)} ₽</span>
-        </button>
+      {/* ФИКСИРОВАННАЯ КНОПКА КОРЗИНЫ - ОБНОВЛЕННЫЙ КОД */}
+
+      <div
+        className="position-fixed bottom-0 start-0 end-0"
+        style={{
+          zIndex: 9999, // Очень высокий z-index
+          height: '70px', // Увеличиваем высоту
+          backgroundColor: 'white', // Белый фон под кнопкой
+          boxShadow: '0 -2px 20px rgba(0, 0, 0, 0.1)' // Тень сверху
+        }}
+      >
+        <div className="h-100 w-100 px-3 py-2">
+          <button
+            className={`btn w-100 h-100 d-flex align-items-center justify-content-center rounded-3 shadow ${getTotalItems() === 0 ? 'opacity-75' : ''}`}
+          onClick={() => getTotalItems() > 0 && navigate('/cart')}
+          disabled={getTotalItems() === 0}
+            style={{
+              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+              color: 'white',
+              fontSize: '18px', // Увеличиваем шрифт
+              fontWeight: '700', // Делаем жирнее
+              border: 'none',
+              minHeight: '56px' // Минимальная высота
+            }}
+          >
+            <span className="d-flex align-items-center gap-2">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <circle cx="9" cy="21" r="1"></circle>
+                <circle cx="20" cy="21" r="1"></circle>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+              </svg>
+              Корзина {Number(subtotal).toFixed(0)} ₽
+            </span>
+          </button>
+        </div>
       </div>
+
+      {/* ДОБАВЛЯЕМ ПРОЗРАЧНЫЙ ПЛЕЙСХОЛДЕР ДЛЯ ВЫСОТЫ */}
+      <div style={{ height: '70px' }}></div>
     </div>
   );
 };
