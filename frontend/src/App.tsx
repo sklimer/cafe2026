@@ -16,6 +16,7 @@ import OrderDetailsPage from './pages/OrderDetailsPage';
 import CartPage from './pages/CartPage';
 import Layout from './components/layout/Layout';
 
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
