@@ -1,5 +1,4 @@
-
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import {
   Box,
@@ -28,7 +27,7 @@ import {
   Alert,
   Snackbar,
 } from '@mui/material';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -110,6 +109,16 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
     severity: 'info',
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Состояния для серверной пагинации
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
+    page: 0,
+    pageSize: 20,
+  });
+  const [sortModel, setSortModel] = useState<GridSortModel>([]);
+  const [rowCount, setRowCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [productForm, setProductForm] = useState({
     id: undefined as number | undefined,
@@ -273,6 +282,114 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
     },
   ];
 
+  // Функция загрузки продуктов с сервера
+  const loadProducts = async () => {
+    setLoading(true);
+    try {
+      const params: any = {
+        page: paginationModel.page + 1, // MUI использует 0-based, а сервер 1-based
+        page_size: paginationModel.pageSize,
+      };
+
+      // Добавляем сортировку
+      if (sortModel.length > 0) {
+        const sortField = sortModel[0].field;
+        const sortOrder = sortModel[0].sort;
+        params.ordering = sortOrder === 'desc' ? `-${sortField}` : sortField;
+      }
+
+      // Добавляем поиск
+      if (searchQuery) {
+        params.search = searchQuery;
+      }
+
+      const response = await menuAPI.getProducts(params);
+      const data = response.data;
+
+      console.log('Products API response:', data);
+
+      let productsArray: any[] = [];
+      let totalCount = 0;
+
+      // Обрабатываем различные форматы ответа
+      if (Array.isArray(data)) {
+        productsArray = data;
+        totalCount = data.length;
+      } else if (data && data.results && Array.isArray(data.results)) {
+        productsArray = data.results;
+        totalCount = data.count || 0;
+      } else if (data && data.data && Array.isArray(data.data)) {
+        productsArray = data.data;
+        totalCount = data.total || 0;
+      }
+
+      // Преобразование продуктов
+      const transformedProducts = productsArray.map((product: any) => {
+        const price = parseFloat(product.price) || 0;
+        const oldPrice = parseFloat(product.old_price) || null;
+        const isAvailable = Boolean(product.is_available ?? true);
+
+        const categoryId = product.category?.id || product.category_id || null;
+        const categoryName = categories.find(c => c.id === categoryId)?.name ||
+                           product.category?.name ||
+                           product.category_name ||
+                           product.category ||
+                           'Не указана';
+
+        return {
+          id: product.id,
+          name: product.name || 'Без названия',
+          category: categoryName,
+          category_id: categoryId,
+          category_name: categoryName,
+          price: price,
+          old_price: oldPrice,
+          costPrice: product.cost_price || 0,
+          isAvailable: isAvailable,
+          stockQuantity: product.stock_quantity || 0,
+          orderCount: product.order_count || 0,
+          tags: Array.isArray(product.tags) ? product.tags : [],
+          description: product.description || '',
+          short_description: product.short_description || '',
+          main_image_url: product.main_image_url || '',
+          image_urls: product.image_urls || [],
+          weight_grams: product.weight_grams || null,
+          calories: product.calories || null,
+          cooking_time_minutes: product.cooking_time_minutes || null,
+          is_vegetarian: product.is_vegetarian || false,
+          is_spicy: product.is_spicy || false,
+          is_popular: product.is_popular || false,
+          is_new: product.is_new || false,
+        };
+      });
+
+      console.log('Transformed products count:', transformedProducts.length);
+      console.log('Total count from server:', totalCount);
+
+      setRowCount(totalCount);
+      onUpdateProducts(transformedProducts);
+
+    } catch (error) {
+      console.error('Error loading products:', error);
+      showSnackbar('Ошибка загрузки товаров', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Загружаем продукты при изменении параметров
+  useEffect(() => {
+    loadProducts();
+  }, [paginationModel, sortModel, searchQuery]);
+
+  // Обновляем счетчик строк при изменении продуктов
+  useEffect(() => {
+    if (products.length > 0 && rowCount === 0) {
+      // Если у нас есть продукты, но rowCount не установлен, показываем приблизительное значение
+      setRowCount(products.length * 2); // Примерное значение
+    }
+  }, [products, rowCount]);
+
   const handleEditProduct = (product: Product) => {
     console.log('Редактирование продукта:', product);
 
@@ -432,245 +549,101 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
     setProductImages(updatedImages);
   };
 
-  const uploadImages = async (productId: number): Promise<{ main_image_url: string; image_urls: string[] }> => {
-    const formData = new FormData();
-
-    // Find main image and additional images
-    const mainImage = productImages.find(img => img.isMain && img.file);
-    const additionalImages = productImages.filter(img => !img.isMain && img.file);
-
-    // Append main image if exists and is new
-    if (mainImage && mainImage.file && mainImage.isNew) {
-      formData.append('main_image', mainImage.file);
-    }
-
-    // Append additional images if they are new
-    additionalImages.forEach((img, index) => {
-      if (img.file && img.isNew) {
-        formData.append(`additional_images`, img.file);
-      }
-    });
-
-    // Only make API call if there are new images to upload
-    if ((mainImage && mainImage.file && mainImage.isNew) || additionalImages.some(img => img.file && img.isNew)) {
-      try {
-        // Create axios instance with multipart/form-data headers for file upload
-        const uploadApi = axios.create({
-          baseURL: env.REACT_APP_API_URL || '/api/',
-          withCredentials: true,
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-
-        // Add CSRF token
-        const csrfToken = await getCsrfToken();
-        if (csrfToken) {
-          uploadApi.defaults.headers.common['X-CSRFToken'] = csrfToken;
-        }
-
-        // Upload images to a dedicated endpoint
-        const response = await uploadApi.post(`/products/${productId}/upload-images/`, formData);
-
-        // Return the uploaded image URLs from the response
-        return {
-          main_image_url: response.data.main_image_url || '',
-          image_urls: response.data.image_urls || []
-        };
-      } catch (error) {
-        console.error('Error uploading images:', error);
-        // If upload fails, return empty URLs
-        return {
-          main_image_url: '',
-          image_urls: []
-        };
-      }
-    } else {
-      // If no new images to upload, return empty strings since we don't want to send temporary URLs
-      // The images that were already stored on the server should remain unchanged
-      // We don't send any image URLs in this case to avoid overwriting with temporary URLs
-      return {
-        main_image_url: '',  // Don't update with temporary URLs
-        image_urls: []       // Don't update with temporary URLs
-      };
-    }
-  };
-
-  const updateProductWithImages = async (productId: number, productData: any) => {
-    try {
-      // Check if there are new images to upload
-      const hasNewImages = productImages.some(img => img.file && img.isNew);
-
-      if (hasNewImages) {
-        const uploadedImages = await uploadImages(productId);
-
-        // Only update images if we have actual URLs from successful upload
-        if (uploadedImages.main_image_url || uploadedImages.image_urls.length > 0) {
-          // Используем PATCH для частичного обновления изображений
-          return await menuAPI.patchProduct(productId, {
-            main_image_url: uploadedImages.main_image_url,
-            image_urls: uploadedImages.image_urls
-          });
-        }
-      }
-      return null;
-    } catch (uploadError: any) {
-      console.error('Error uploading images:', uploadError);
-
-      // Подробная информация об ошибке
-      if (uploadError.response?.data) {
-        console.error('Server error details for images:', uploadError.response.data);
-        throw new Error(`Ошибка загрузки изображений: ${JSON.stringify(uploadError.response.data)}`);
-      } else if (uploadError.message) {
-        throw new Error(`Ошибка загрузки изображений: ${uploadError.message}`);
-      } else {
-        throw new Error('Неизвестная ошибка при загрузке изображений');
-      }
-    }
-  };
-
   const handleSubmitProduct = async () => {
-  try {
-    // Валидация формы
-    if (!productForm.name.trim()) {
-      showSnackbar('Пожалуйста, заполните название товара', 'error');
-      return;
-    }
-
-    if (!productForm.price || parseFloat(productForm.price) <= 0) {
-      showSnackbar('Пожалуйста, укажите корректную цену', 'error');
-      return;
-    }
-
-    const isEditing = Boolean(productForm.id);
-
-    // Создаем FormData для отправки данных с файлами
-    const formData = new FormData();
-
-    // Добавляем текстовые поля
-    formData.append('name', productForm.name.trim());
-    formData.append('description', productForm.description.trim());
-    formData.append('price', parseFloat(productForm.price).toString());
-    formData.append('is_available', productForm.isAvailable.toString());
-    formData.append('stock_quantity', parseInt(productForm.stockQuantity).toString() || '0');
-
-    // Добавляем необязательные поля
-    if (productForm.short_description.trim()) {
-      formData.append('short_description', productForm.short_description.trim());
-    }
-
-    if (productForm.old_price && parseFloat(productForm.old_price) > 0) {
-      formData.append('old_price', parseFloat(productForm.old_price).toString());
-    }
-
-    if (productForm.weight_grams) {
-      formData.append('weight_grams', productForm.weight_grams);
-    }
-
-    if (productForm.calories) {
-      formData.append('calories', productForm.calories);
-    }
-
-    if (productForm.cooking_time_minutes) {
-      formData.append('cooking_time_minutes', productForm.cooking_time_minutes);
-    }
-
-    // Флаги
-    formData.append('is_vegetarian', productForm.is_vegetarian.toString());
-    formData.append('is_spicy', productForm.is_spicy.toString());
-    formData.append('is_popular', productForm.is_popular.toString());
-    formData.append('is_new', productForm.is_new.toString());
-
-    // Категория
-    if (productForm.category) {
-      const categoryId = parseInt(productForm.category);
-      const categoryExists = categories.find(c => c.id === categoryId);
-      if (categoryExists) {
-        formData.append('category', categoryId.toString());
+    try {
+      // Валидация формы
+      if (!productForm.name.trim()) {
+        showSnackbar('Пожалуйста, заполните название товара', 'error');
+        return;
       }
-    }
 
-    // Добавляем изображения
-    productImages.forEach((image, index) => {
-      if (image.file) {
-        if (image.isMain) {
-          formData.append('main_image', image.file);
-        } else {
-          formData.append('image_urls', image.file);
+      if (!productForm.price || parseFloat(productForm.price) <= 0) {
+        showSnackbar('Пожалуйста, укажите корректную цену', 'error');
+        return;
+      }
+
+      const isEditing = Boolean(productForm.id);
+
+      // Создаем FormData для отправки данных с файлами
+      const formData = new FormData();
+
+      // Добавляем текстовые поля
+      formData.append('name', productForm.name.trim());
+      formData.append('description', productForm.description.trim());
+      formData.append('price', parseFloat(productForm.price).toString());
+      formData.append('is_available', productForm.isAvailable.toString());
+      formData.append('stock_quantity', parseInt(productForm.stockQuantity).toString() || '0');
+
+      // Добавляем необязательные поля
+      if (productForm.short_description.trim()) {
+        formData.append('short_description', productForm.short_description.trim());
+      }
+
+      if (productForm.old_price && parseFloat(productForm.old_price) > 0) {
+        formData.append('old_price', parseFloat(productForm.old_price).toString());
+      }
+
+      if (productForm.weight_grams) {
+        formData.append('weight_grams', productForm.weight_grams);
+      }
+
+      if (productForm.calories) {
+        formData.append('calories', productForm.calories);
+      }
+
+      if (productForm.cooking_time_minutes) {
+        formData.append('cooking_time_minutes', productForm.cooking_time_minutes);
+      }
+
+      // Флаги
+      formData.append('is_vegetarian', productForm.is_vegetarian.toString());
+      formData.append('is_spicy', productForm.is_spicy.toString());
+      formData.append('is_popular', productForm.is_popular.toString());
+      formData.append('is_new', productForm.is_new.toString());
+
+      // Категория
+      if (productForm.category) {
+        const categoryId = parseInt(productForm.category);
+        const categoryExists = categories.find(c => c.id === categoryId);
+        if (categoryExists) {
+          formData.append('category', categoryId.toString());
         }
       }
-    });
 
-    console.log('Submitting product with FormData');
+      // ВАЖНО: Добавляем изображения правильно
+      // Находим основное изображение
+      const mainImage = productImages.find(img => img.isMain && img.file);
 
-    let response;
-    let productId: number;
-
-    // Создаем или обновляем товар
-    if (isEditing && productForm.id) {
-      response = await menuAPI.updateProduct(productForm.id, formData);
-      productId = productForm.id;
-    } else {
-      response = await menuAPI.createProduct(formData);
-      productId = response.data.id;
-    }
-
-    console.log('Server response:', response);
-
-    // Обновляем список продуктов
-    try {
-      const productsRes = await menuAPI.getProducts();
-      const data = productsRes.data;
-
-      let productsArray: any[] = [];
-      if (Array.isArray(data)) {
-        productsArray = data;
-      } else if (data && data.results && Array.isArray(data.results)) {
-        productsArray = data.results;
-      } else if (data && data.data && Array.isArray(data.data)) {
-        productsArray = data.data;
+      // Добавляем основное изображение (если есть новое)
+      if (mainImage && mainImage.file) {
+        formData.append('main_image', mainImage.file);
       }
 
-      const transformedProducts = productsArray.map((product: any) => {
-        const price = parseFloat(product.price) || 0;
-        const oldPrice = parseFloat(product.old_price) || null;
-        const isAvailable = Boolean(product.is_available ?? true);
-
-        const categoryId = product.category?.id || product.category_id || null;
-        const categoryName = categories.find(c => c.id === categoryId)?.name ||
-                           product.category?.name ||
-                           product.category_name ||
-                           product.category ||
-                           'Не указана';
-
-        return {
-          id: product.id,
-          name: product.name || 'Без названия',
-          category: categoryName,
-          category_id: categoryId,
-          category_name: categoryName,
-          price: price,
-          old_price: oldPrice,
-          costPrice: product.cost_price || 0,
-          isAvailable: isAvailable,
-          stockQuantity: product.stock_quantity || 0,
-          orderCount: product.order_count || 0,
-          tags: Array.isArray(product.tags) ? product.tags : [],
-          description: product.description || '',
-          short_description: product.short_description || '',
-          main_image_url: product.main_image_url || '',
-          image_urls: product.image_urls || [],
-          weight_grams: product.weight_grams || null,
-          calories: product.calories || null,
-          cooking_time_minutes: product.cooking_time_minutes || null,
-          is_vegetarian: product.is_vegetarian || false,
-          is_spicy: product.is_spicy || false,
-          is_popular: product.is_popular || false,
-          is_new: product.is_new || false,
-        };
+      // Добавляем дополнительные изображения (только новые)
+      productImages.forEach((image) => {
+        if (image.file && !image.isMain) {
+          formData.append('additional_images', image.file);
+        }
       });
 
-      onUpdateProducts(transformedProducts);
+      console.log('Submitting product with FormData');
+
+      let response;
+      let productId: number;
+
+      // Создаем или обновляем товар
+      if (isEditing && productForm.id) {
+        response = await menuAPI.updateProduct(productForm.id, formData);
+        productId = productForm.id;
+      } else {
+        response = await menuAPI.createProduct(formData);
+        productId = response.data.id;
+      }
+
+      console.log('Server response:', response);
+
+      // Перезагружаем продукты
+      await loadProducts();
       handleCloseProductDialog();
 
       showSnackbar(
@@ -678,74 +651,112 @@ const ProductsTab: React.FC<ProductsTabProps> = ({
         'success'
       );
 
-    } catch (refreshError) {
-      console.error('Error refreshing products list:', refreshError);
-      showSnackbar('Товар сохранен, но возникла ошибка при обновлении списка', 'warning');
-    }
+    } catch (error: any) {
+      console.error('Error creating/updating product:', error);
 
-  } catch (error: any) {
-    console.error('Error creating/updating product:', error);
+      // Подробная информация об ошибке
+      if (error.response?.data) {
+        console.error('Server error details:', error.response.data);
 
-    // Подробная информация об ошибке
-    if (error.response?.data) {
-      console.error('Server error details:', error.response.data);
+        let errorMessage = 'Ошибка при сохранении товара:\n';
 
-      let errorMessage = 'Ошибка при сохранении товара:\n';
+        if (error.response.data.detail) {
+          errorMessage += error.response.data.detail;
+        } else if (typeof error.response.data === 'object') {
+          Object.keys(error.response.data).forEach(key => {
+            if (Array.isArray(error.response.data[key])) {
+              errorMessage += `${key}: ${error.response.data[key].join(', ')}\n`;
+            } else {
+              errorMessage += `${key}: ${error.response.data[key]}\n`;
+            }
+          });
+        } else if (typeof error.response.data === 'string') {
+          errorMessage += error.response.data;
+        } else {
+          errorMessage += JSON.stringify(error.response.data);
+        }
 
-      if (error.response.data.detail) {
-        errorMessage += error.response.data.detail;
-      } else if (typeof error.response.data === 'object') {
-        Object.keys(error.response.data).forEach(key => {
-          if (Array.isArray(error.response.data[key])) {
-            errorMessage += `${key}: ${error.response.data[key].join(', ')}\n`;
-          } else {
-            errorMessage += `${key}: ${error.response.data[key]}\n`;
-          }
-        });
-      } else if (typeof error.response.data === 'string') {
-        errorMessage += error.response.data;
+        showSnackbar(errorMessage, 'error');
+      } else if (error.message) {
+        showSnackbar(`Ошибка: ${error.message}`, 'error');
       } else {
-        errorMessage += JSON.stringify(error.response.data);
+        showSnackbar('Ошибка при сохранении товара', 'error');
       }
-
-      showSnackbar(errorMessage, 'error');
-    } else if (error.message) {
-      showSnackbar(`Ошибка: ${error.message}`, 'error');
-    } else {
-      showSnackbar('Ошибка при сохранении товара', 'error');
     }
-  }
-};
+  };
+
+  // Обработчики пагинации и сортировки
+  const handlePaginationModelChange = (newModel: GridPaginationModel) => {
+    setPaginationModel(newModel);
+  };
+
+  const handleSortModelChange = (newModel: GridSortModel) => {
+    setSortModel(newModel);
+  };
+
+  // Обработчик поиска
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    // Сбрасываем пагинацию при поиске
+    setPaginationModel({ page: 0, pageSize: paginationModel.pageSize });
+  };
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-        <Button variant="contained" onClick={handleAddProduct} startIcon={<AddIcon />}>
-          Добавить товар
-        </Button>
+      {/* Панель управления */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h6" component="div">
+          Управление товарами
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+          {/* Поле поиска */}
+          <TextField
+            placeholder="Поиск товаров..."
+            variant="outlined"
+            size="small"
+            value={searchQuery}
+            onChange={handleSearch}
+            sx={{ width: 300 }}
+          />
+          <Button variant="contained" onClick={handleAddProduct} startIcon={<AddIcon />}>
+            Добавить товар
+          </Button>
+        </Box>
       </Box>
+
       <Paper sx={{ height: 600 }}>
         <Typography variant="h6" sx={{ p: 2 }}>
-          Товары ({products.length})
+          Товары ({rowCount})
         </Typography>
-        {products.length > 0 ? (
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+            <CircularProgress />
+          </Box>
+        ) : products.length > 0 ? (
           <DataGrid
             rows={products}
             columns={productColumns}
-            pageSizeOptions={[5, 10, 20]}
-            initialState={{
-              pagination: {
-                paginationModel: { pageSize: 10 },
-              },
-            }}
-            checkboxSelection={false}
+            paginationModel={paginationModel}
+            onPaginationModelChange={handlePaginationModelChange}
+            sortModel={sortModel}
+            onSortModelChange={handleSortModelChange}
+            paginationMode="server"
+            sortingMode="server"
+            rowCount={rowCount}
+            pageSizeOptions={[10, 20, 50, 100]}
+            loading={loading}
             disableRowSelectionOnClick
+            sx={{
+              '& .MuiDataGrid-virtualScroller': {
+                overflow: 'auto',
+              }
+            }}
           />
         ) : (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
             <Box sx={{ textAlign: 'center' }}>
               <Typography color="text.secondary">
-                Товары не найдены
+                {searchQuery ? 'Товары не найдены по вашему запросу' : 'Товары не найдены'}
               </Typography>
             </Box>
           </Box>

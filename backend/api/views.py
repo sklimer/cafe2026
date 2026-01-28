@@ -424,9 +424,9 @@ class ProductViewSet(viewsets.ModelViewSet):
     from rest_framework import filters
     from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
-    queryset = Product.objects.all()  # Changed to all to allow admin management
+    queryset = Product.objects.all()
     serializer_class = ProductSerializer
-    parser_classes = [MultiPartParser, FormParser, JSONParser]  # Add support for file uploads
+    parser_classes = [MultiPartParser, FormParser, JSONParser]  # Важно: MultiPartParser должен быть первым!
     filter_backends = [filters.SearchFilter, DjangoFilterBackend, filters.OrderingFilter]
     search_fields = ['name', 'description', 'short_description']
     filterset_fields = ['restaurant', 'category', 'is_available', 'is_popular', 'is_new',

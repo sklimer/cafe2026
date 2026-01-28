@@ -7,9 +7,6 @@ import { env } from '../config/env';
 const api = axios.create({
   baseURL: env.REACT_APP_API_URL || '/api/', // Use environment variable or default - API is under /api/v1
   timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 // Function to get CSRF token
@@ -88,7 +85,21 @@ export const ordersAPI = {
 
 // Menu API endpoints
 export const menuAPI = {
-  getProducts: (params?: any) => api.get('/products', params),
+  getProducts: (params?: any) => {
+    // Поддержка параметров пагинации
+    const queryParams = new URLSearchParams();
+
+    if (params) {
+      Object.keys(params).forEach(key => {
+        if (params[key] !== undefined && params[key] !== null) {
+          queryParams.append(key, params[key].toString());
+        }
+      });
+    }
+
+    const url = queryParams.toString() ? `/products/?${queryParams.toString()}` : '/products/';
+    return api.get(url);
+  },
   getProductById: (id: number) => api.get(`/products/${id}`),
   createProduct: (data: any) => api.post('/products/', data),
   updateProduct: (id: number, data: any) => api.put(`/products/${id}/`, data),

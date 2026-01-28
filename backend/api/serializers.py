@@ -137,11 +137,13 @@ class OptionValueSerializer(serializers.ModelSerializer):
 
 
 class ProductCreateUpdateSerializer(serializers.ModelSerializer):
-    main_image = serializers.ImageField(required=False, allow_null=True)
+    # Измените поля для приема одного файла, а не списка
+    main_image = serializers.ImageField(required=False, allow_null=True, write_only=True)
     additional_images = serializers.ListField(
         child=serializers.ImageField(),
         required=False,
-        allow_empty=True
+        allow_empty=True,
+        write_only=True
     )
 
     class Meta:
@@ -164,7 +166,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         main_image = validated_data.pop('main_image', None)
         additional_images = validated_data.pop('additional_images', [])
 
-        # Создаем продукт
+        # Создаем продукт без изображений
         product = Product.objects.create(**validated_data)
 
         # Сохраняем основное изображение
@@ -186,7 +188,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         # Извлекаем файлы изображений
         main_image = validated_data.pop('main_image', None)
-        additional_images = validated_data.pop('additional_images', [])
+        additional_images = validated_data.pop('additional_images', None)
 
         # Обновляем остальные поля
         for attr, value in validated_data.items():
