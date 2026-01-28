@@ -450,9 +450,9 @@ const ChatBurgerMenu: React.FC = () => {
       >
         <div className="h-100 w-100 px-3 py-2">
           <button
-            className={`btn w-100 h-100 d-flex align-items-center justify-content-center rounded-3 shadow ${getTotalItems() === 0 ? 'opacity-75' : ''}`}
-          onClick={() => getTotalItems() > 0 && navigate('/cart')}
-          disabled={getTotalItems() === 0}
+            className={`btn w-100 h-100 d-flex align-items-center justify-content-center rounded-3 shadow ${totalItems() === 0 ? 'opacity-75' : ''}`}
+          onClick={() => totalItems() > 0 && navigate('/cart')}
+          disabled={totalItems() === 0}
             style={{
               background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
               color: 'white',

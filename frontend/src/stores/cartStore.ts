@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import type { Product, CartItem, SelectedOption } from '../types/index';
 
@@ -22,17 +21,42 @@ interface CartState {
   removeItemFromState: (state: CartState, itemId: string) => CartState;
 }
 
+// Функция для расчета цены с учетом опций (объявляем в начале файла)
+function calculateItemPrice(product: Product, options: SelectedOption[]): number {
+  let price = Number(product.price);
+
+  for (const option of options) {
+    const optionDef = product.options?.find(opt => opt.id === option.optionId);
+    if (optionDef) {
+      const value = optionDef.values?.find(val => val.id === option.valueId);
+      if (value) {
+        price += Number(value.priceDelta || 0);
+      }
+    }
+  }
+
+  return price;
+}
+
 // Функции для работы с localStorage
-const loadCartFromStorage = (): CartState | null => {
+const loadCartFromStorage = (): Partial<CartState> => {
   try {
     const stored = localStorage.getItem('cart');
     if (stored) {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      // Проверяем структуру данных
+      if (parsed && Array.isArray(parsed.items)) {
+        return {
+          items: parsed.items || [],
+          restaurantId: parsed.restaurantId || null,
+          subtotal: parsed.subtotal || 0
+        };
+      }
     }
   } catch (error) {
     console.error('Error loading cart from storage:', error);
   }
-  return null;
+  return {};
 };
 
 const saveCartToStorage = (state: CartState) => {
@@ -47,10 +71,11 @@ const saveCartToStorage = (state: CartState) => {
   }
 };
 
-const initialState = loadCartFromStorage() || {
-  items: [],
-  restaurantId: null,
+const initialState = {
+  items: [] as CartItem[],
+  restaurantId: null as string | null,
   subtotal: 0,
+  ...loadCartFromStorage()
 };
 
 export const useCartStore = create<CartState>((set, get) => ({
@@ -60,20 +85,22 @@ export const useCartStore = create<CartState>((set, get) => ({
     // Проверяем, совпадает ли ресторан
     if (state.restaurantId && state.restaurantId !== product.restaurantId) {
       // Если нет, очищаем корзину перед добавлением
+      const newItem: CartItem = {
+        id: `${product.id}_${Date.now()}`,
+        productId: product.id,
+        product,
+        quantity,
+        selectedOptions: options,
+        price: calculateItemPrice(product, options)
+      };
+      
       const newState = {
         ...state,
-        items: [{
-          id: `${product.id}_${Date.now()}`,
-          productId: product.id,
-          product,
-          quantity,
-          selectedOptions: options,
-          price: Number(calculateItemPrice(product, options))
-        }],
+        items: [newItem],
         restaurantId: product.restaurantId,
-        subtotal: Number(calculateItemPrice(product, options)) * quantity
+        subtotal: calculateItemPrice(product, options) * quantity
       };
-      saveCartToStorage(newState); // Сохраняем в localStorage
+      saveCartToStorage(newState);
       return newState;
     }
 
@@ -99,7 +126,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         product,
         quantity,
         selectedOptions: options,
-        price: Number(calculateItemPrice(product, options))
+        price: calculateItemPrice(product, options)
       });
     }
 
@@ -109,7 +136,7 @@ export const useCartStore = create<CartState>((set, get) => ({
       restaurantId: state.restaurantId || product.restaurantId,
       subtotal: newItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
     };
-    saveCartToStorage(newState); // Сохраняем в localStorage
+    saveCartToStorage(newState);
     return newState;
   }),
 
@@ -127,29 +154,38 @@ export const useCartStore = create<CartState>((set, get) => ({
       items: updatedItems,
       subtotal: updatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
     };
-    saveCartToStorage(newState); // Сохраняем в localStorage
+    saveCartToStorage(newState);
     return newState;
   }),
 
   removeItem: (itemId) => set((state) => {
     const newState = get().removeItemFromState(state, itemId);
-    saveCartToStorage(newState); // Сохраняем в localStorage
+    saveCartToStorage(newState);
     return newState;
   }),
 
   clearCart: () => {
     const newState = { items: [], restaurantId: null, subtotal: 0 };
-    saveCartToStorage(newState); // Сохраняем в localStorage
+    saveCartToStorage(newState);
     set(newState);
   },
 
   // Computed properties
-  totalItems: 0, // Will be calculated dynamically in the getter below
+  totalItems: () => {
+    const state = get();
+    return state.items.reduce((sum, item) => sum + item.quantity, 0);
+  },
 
-  itemCount: (productId: string) => 0, // Will be calculated dynamically in the getter below
+  itemCount: (productId: string) => {
+    const state = get();
+    return state.items
+      .filter(item => item.productId === productId)
+      .reduce((sum, item) => sum + item.quantity, 0);
+  },
 
   isSameRestaurant: (restaurantId: string) => {
-    return this.restaurantId === restaurantId;
+    const state = get();
+    return state.restaurantId === restaurantId;
   },
 
   // Вспомогательная функция для удаления элемента
@@ -162,33 +198,4 @@ export const useCartStore = create<CartState>((set, get) => ({
     };
     return newState;
   }
-}), (set, get) => ({
-  // Computed getters
-  totalItems: () => {
-    const state = get();
-    return state.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
-  },
-
-  itemCount: (productId: string) => {
-    const state = get();
-    return state.items?.filter(item => item.productId === productId)
-      .reduce((sum, item) => sum + item.quantity, 0) ?? 0;
-  }
 }));
-
-// Вспомогательная функция для расчета цены с учетом опций
-function calculateItemPrice(product: Product, options: SelectedOption[]): number {
-  let price = Number(product.price);
-
-  for (const option of options) {
-    const optionDef = product.options.find(opt => opt.id === option.optionId);
-    if (optionDef) {
-      const value = optionDef.values.find(val => val.id === option.valueId);
-      if (value) {
-        price += Number(value.priceDelta);
-      }
-    }
-  }
-
-  return price;
-}

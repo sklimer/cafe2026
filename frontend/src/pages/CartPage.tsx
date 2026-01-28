@@ -278,7 +278,7 @@ const CartPage: React.FC = () => {
         <Container className="px-3 py-3">
           <div className="row align-items-center">
             <div className="col">
-              <div className="small text-muted">Товаров: {getTotalItems()}</div>
+              <div className="small text-muted">Товаров: {totalItems()}</div>
               <div className="h4 fw-bold text-dark mb-0">
                 {Number(subtotal).toFixed(0)} ₽
               </div>
