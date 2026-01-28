@@ -537,6 +537,12 @@ class ProductViewSet(viewsets.ModelViewSet):
         # Implementation would go here
         return Response({'results': []})
 
+    def get_serializer_context(self):
+        """Передаем request в контекст сериализатора для формирования полных URL"""
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
 
 class TagViewSet(viewsets.ReadOnlyModelViewSet):
     """

@@ -1,4 +1,3 @@
-
 import { ApiResponse } from '../types';
 
 const API_BASE_URL = 'http://localhost:8000/api';
@@ -15,6 +14,27 @@ interface ApiLog {
   success: boolean;
   error?: string;
 }
+
+// Функция для получения полного URL изображения
+export const getFullImageUrl = (imagePath: string | null): string | null => {
+  if (!imagePath) return null;
+
+  // Если это уже полный URL
+  if (imagePath.startsWith('http')) {
+    return imagePath;
+  }
+
+  // Базовый URL для API (берем из env или используем дефолтный)
+  const BASE_URL = import.meta.env.VITE_APP_BASE_URL || 'http://localhost:8000';
+
+  // Если путь начинается с /, добавляем к базовому URL
+  if (imagePath.startsWith('/')) {
+    return `${BASE_URL}${imagePath}`;
+  }
+
+  // В остальных случаях предполагаем, что это относительный путь к медиафайлам
+  return `${BASE_URL}/media/${imagePath}`;
+};
 
 class ApiClient {
   private logs: ApiLog[] = [];

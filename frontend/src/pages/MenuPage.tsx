@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCartStore } from '../stores/cartStore';
 import { Product, Category } from '../types';
-import { apiClient } from '../api/client';
+import { apiClient, getFullImageUrl } from '../api/client';
 import { useQuery } from '@tanstack/react-query';
+import { Container, Row, Col } from 'react-bootstrap';
 
 // Вспомогательная функция для безопасного доступа к тегам
 const getProductTags = (product: any): any[] => {
@@ -22,31 +23,69 @@ const renderBadge = (tag: any, index: number) => {
 
   const tagName = tag.name.toLowerCase();
 
-  // Определение цветов для бейджей
+  // Определение цветов для бейджей с синей темой
   const getBadgeStyle = (tag: string) => {
     switch(tag) {
       case 'острый':
-        return 'bg-[#ffcac4] text-black';
+        return 'bg-danger text-white';
       case 'хит':
-        return 'bg-[#886eee] text-white';
+        return 'bg-warning text-dark';
       case 'новинка':
-        return 'bg-[#4bb14b] text-white';
+        return 'bg-success text-white';
       case 'скидка':
-        return 'bg-[#eda735] text-white';
+        return 'bg-primary text-white';
       case 'от шефа':
-        return 'bg-[#313731] text-white';
+        return 'bg-dark text-white';
       default:
-        return 'bg-gray-200 text-gray-800';
+        return 'bg-secondary text-white';
+    }
+  };
+
+  const getBadgeText = (tagName: string) => {
+    switch(tagName) {
+      case 'острый': return '🌶️';
+      case 'хит': return '🔥';
+      case 'новинка': return '🆕';
+      case 'скидка': return '💰';
+      case 'от шефа': return '👨‍🍳';
+      default: return tag.name;
     }
   };
 
   return (
-    <div
+    <motion.div
       key={index}
-      className={`item-badge px-2 py-1 text-xs font-bold rounded-full mr-1 mb-1 ${getBadgeStyle(tagName)}`}
+      initial={{ scale: 0.8, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ delay: index * 0.1 }}
+      className={`position-absolute top-0 start-0 px-2 py-1 text-xs fw-bold rounded m-2 ${getBadgeStyle(tagName)} shadow-sm`}
+      style={{ zIndex: 1 }}
     >
-      {tagName === 'острый' ? '🌶️ Острый' : tag.name}
-    </div>
+      {getBadgeText(tagName)}
+    </motion.div>
+  );
+};
+
+// Компонент для изображения с запасным вариантом
+const ProductImage: React.FC<{ src: string | null; alt: string }> = ({ src, alt }) => {
+  const [hasError, setHasError] = useState(false);
+
+  if (!src || hasError) {
+    return (
+      <div className="w-100 h-100 d-flex align-items-center justify-content-center bg-light rounded">
+        <span className="display-4 text-muted">🍔</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="w-100 h-100 object-fit-cover rounded"
+      onError={() => setHasError(true)}
+      style={{ borderRadius: '12px' }}
+    />
   );
 };
 
@@ -54,10 +93,15 @@ const ChatBurgerMenu: React.FC = () => {
   const navigate = useNavigate();
   const { addItem, subtotal, items } = useCartStore();
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const categoriesRef = useRef<HTMLDivElement>(null);
+  const prevScrollY = useRef(0);
 
   const [orderType, setOrderType] = useState<'delivery' | 'pickup'>('pickup');
   const [activeCategory, setActiveCategory] = useState<string>('');
-  const [showCategories, setShowCategories] = useState(true);
+  const [showHeader, setShowHeader] = useState(true);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [categoriesFixed, setCategoriesFixed] = useState(false);
 
   // Загрузка данных
   const { data: menuData, isLoading } = useQuery({
@@ -88,15 +132,7 @@ const ChatBurgerMenu: React.FC = () => {
     }
   }, [categories]);
 
-  // Фильтрация продуктов по категории
-  const productsByCategory = activeCategory
-    ? products.filter(product => {
-        const productCategoryId = product.categoryId || product.category;
-        return productCategoryId?.toString() === activeCategory;
-      })
-    : products;
-
-  // Группировка продуктов по категориям для отображения всех категорий сразу
+  // Группировка продуктов по категориям
   const productsByCategories = categories.reduce((acc, category) => {
     const categoryProducts = products.filter(product => {
       const productCategoryId = product.categoryId || product.category;
@@ -113,43 +149,96 @@ const ChatBurgerMenu: React.FC = () => {
     return acc;
   }, [] as Array<Category & { products: Product[] }>);
 
-  // Добавление в корзину
-  const handleAddToCart = (product: Product) => {
+  // Добавление в корзину при клике на карточку
+  const handleAddToCart = (product: Product, e: React.MouseEvent) => {
+    e.stopPropagation();
     addItem(product, 1, []);
+
+    // Анимация добавления
+    const priceElement = document.getElementById(`price-${product.id}`);
+    if (priceElement) {
+      priceElement.classList.add('animate__pulse', 'animate__faster');
+      setTimeout(() => {
+        priceElement.classList.remove('animate__pulse', 'animate__faster');
+      }, 300);
+    }
   };
 
-  // Обработчик прокрутки для скрытия/показа категорий
+  // Обработчик прокрутки
   useEffect(() => {
     const handleScroll = () => {
-      if (window.scrollY > 100) {
-        setShowCategories(false);
+      const currentScrollY = window.scrollY;
+      const headerHeight = headerRef.current?.offsetHeight || 0;
+      const categoriesTop = categoriesRef.current?.offsetTop || 0;
+
+      // Проверяем, коснулись ли категории верха экрана
+      if (currentScrollY >= categoriesTop - 60) {
+        setCategoriesFixed(true);
       } else {
-        setShowCategories(true);
+        setCategoriesFixed(false);
       }
+
+      // Управление видимостью хедера при скролле
+      if (currentScrollY > 100) {
+        setIsScrolled(true);
+        if (currentScrollY > prevScrollY.current) {
+          // Скролл вниз
+          setShowHeader(false);
+        } else {
+          // Скролл вверх
+          setShowHeader(true);
+        }
+      } else {
+        setIsScrolled(false);
+        setShowHeader(true);
+      }
+
+      prevScrollY.current = currentScrollY;
     };
-    window.addEventListener('scroll', handleScroll);
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Функция для обработки смены категории
+  const handleCategoryChange = (categoryId: string) => {
+    setActiveCategory(categoryId);
+    const element = document.getElementById(`category-${categoryId}`);
+    if (element) {
+      const offset = categoriesFixed ? 120 : 200; // Учитываем фиксированное меню
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - offset;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-white">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      <div className="d-flex align-items-center justify-content-center vh-100 bg-light">
+        <div className="text-center">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Загрузка...</span>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!menuData?.success) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen p-4 bg-white">
-        <div className="text-4xl mb-4">🍔</div>
-        <h2 className="text-xl font-bold mb-2">Не удалось загрузить меню</h2>
-        <p className="text-gray-600 text-center mb-4">
+      <div className="d-flex flex-column align-items-center justify-content-center vh-100 p-4 bg-light">
+        <div className="display-1 mb-4 animate__animated animate__bounce">🍔</div>
+        <h2 className="h2 mb-2 text-dark">Не удалось загрузить меню</h2>
+        <p className="text-muted text-center mb-4">
           {menuData?.error || 'Произошла ошибка при загрузке данных'}
         </p>
         <button
           onClick={() => window.location.reload()}
-          className="bg-orange-500 text-white px-6 py-3 rounded-xl font-medium"
+          className="btn btn-primary text-white px-5 py-3 fw-bold shadow"
         >
           Обновить страницу
         </button>
@@ -158,253 +247,210 @@ const ChatBurgerMenu: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white pb-20">
-      {/* Верхняя панель навигации */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-4">
-            <button className="p-2">
-              <div className="icon-18-menu-burger">
-                <svg width="18" height="14" viewBox="0 0 18 14" fill="currentColor">
-                  <path d="M17.2174 6.21729H0.782596C0.350376 6.21729 0 6.56766 0 6.99988C0 7.4321 0.350376 7.78248 17.2174 7.78248C17.6496 7.78248 18 7.4321 18 6.99988C18 6.56766 17.6496 6.21729 17.2174 6.21729Z"></path>
-                  <path d="M0.782596 2.30445H17.2174C17.6496 2.30445 18 1.95407 18 1.52185C18 1.08963 17.6496 0.739258 17.2174 0.739258H0.782596C0.350376 0.739258 0 1.08963 0 1.52185C0 1.95407 0.350376 2.30445 0.782596 2.30445Z"></path>
-                  <path d="M17.2174 11.6958H0.782596C0.350376 11.6958 0 12.0462 0 12.4784C0 12.9107 0.350376 13.261 0.782596 13.261H17.2174C17.6496 13.261 18 12.9107 18 12.4784C18 12.0462 17.6496 11.6958 17.2174 11.6958Z"></path>
-                </svg>
-              </div>
-            </button>
-
-            <div className="city flex-1 mx-4">
-              <div className="name-city">
-                <div className="font-medium">Самара</div>
-              </div>
-            </div>
-
-            <button className="p-2">
-              <div className="icons-18-search">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                  <path d="M15.708 14.2968L12.611 11.1987C14.9283 8.10223 14.2965 3.71356 11.1997 1.39641C8.10291 -0.920736 3.71387 -0.288925 1.39653 2.80759C-0.920813 5.90411 -0.28895 10.2928 2.80783 12.6099C5.29542 14.4713 8.71207 14.4713 11.1997 12.6099L14.298 15.708C14.6874 16.0973 15.3187 16.0973 15.708 15.708C16.0973 15.3187 16.0973 14.6875 15.708 14.2982L15.708 14.2968ZM7.02958 12.012C4.27731 12.012 2.04618 9.78103 2.04618 7.02899C2.04618 4.27695 4.27731 2.04601 7.02958 2.04601C9.78185 2.04601 12.013 4.27695 12.013 7.02899C12.01 9.77978 9.78063 12.009 7.02958 12.012Z"></path>
-                </svg>
-              </div>
-            </button>
-          </div>
-
-          {/* Выбор типа доставки */}
-          <div className="select-type-delivery mb-4">
-            <div className="row">
-              <div className="select-content bg-gray-100 rounded-full p-1 inline-flex">
-                <div className={`item px-4 py-2 rounded-full ${orderType === 'delivery' ? 'bg-white text-gray-900' : 'text-gray-600'}`}>
-                  <div className="text" onClick={() => setOrderType('delivery')}>
-                    <div className="text-sm font-medium">Доставка</div>
-                  </div>
-                </div>
-                <div className={`item px-4 py-2 rounded-full ${orderType === 'pickup' ? 'bg-white text-gray-900' : 'text-gray-600'}`}>
-                  <div className="text" onClick={() => setOrderType('pickup')}>
-                    <div className="text-sm font-medium">Самовывоз</div>
-                  </div>
-                </div>
-              </div>
+    <div className="min-vh-100 bg-white pb-5">
+      {/* Основной хедер */}
+      <motion.header
+        ref={headerRef}
+        initial={{ y: 0 }}
+        animate={{ y: showHeader ? 0 : -80 }}
+        transition={{ duration: 0.3 }}
+        className={`sticky-top bg-white border-bottom ${isScrolled ? 'shadow-sm' : ''}`}
+      >
+        <Container className="px-3 pt-3">
+          {/* Переключатель доставки */}
+          <div className="mb-3">
+            <div className="d-inline-flex rounded bg-light p-1">
+              <button
+                className={`btn btn-sm px-4 py-2 ${orderType === 'delivery' ? 'btn-light shadow-sm text-primary' : 'btn-text'}`}
+                onClick={() => setOrderType('delivery')}
+              >
+                <span className="me-1">🚚</span>
+                Доставка
+              </button>
+              <button
+                className={`btn btn-sm px-4 py-2 ${orderType === 'pickup' ? 'btn-light shadow-sm text-primary' : 'btn-text'}`}
+                onClick={() => setOrderType('pickup')}
+              >
+                <span className="me-1">🏃</span>
+                Самовывоз
+              </button>
             </div>
           </div>
 
-          {/* Адрес */}
-          <div className="select-address mb-4">
-            <div className="menu-content-item flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="18" viewBox="0 0 16 18" fill="currentColor" className="mr-2">
-                <path d="M15.125 7.5C15.0915 8.92533 14.7368 10.3247 14.0876 11.5941C13.4383 12.8634 12.5111 13.9699 11.375 14.8312V17.25C11.375 17.4489 11.296 17.6397 11.1553 17.7803C11.0147 17.921 10.8239 18 10.625 18C10.4261 18 10.2353 17.921 10.0947 17.7803C9.95402 17.6397 9.875 17.4489 9.875 17.25V1.5C9.86827 1.2182 9.94528 0.94073 10.0963 0.702697C10.2473 0.464663 10.4655 0.276758 10.7233 0.16275C11.0194 0.0422739 11.3442 0.0106726 11.658 0.0718081C11.9718 0.132944 12.261 0.284168 12.4902 0.507C14.2298 2.41572 15.1725 4.91797 15.125 7.5ZM6.875 0C6.67609 0 6.48532 0.0790176 6.34467 0.21967C6.20402 0.360322 6.125 0.551088 6.125 0.75V5.25C6.12308 5.7137 5.97794 6.16547 5.70943 6.54352C5.44093 6.92158 5.06218 7.20744 4.625 7.362V0.75C4.625 0.551088 4.54598 0.360322 4.40533 0.21967C4.26468 0.0790176 4.07391 0 3.875 0C3.67609 0 3.48532 0.0790176 3.34467 0.21967C3.20402 0.360322 3.125 0.551088 3.125 0.75V7.362C2.68782 7.20744 2.30907 6.92158 2.04057 6.54352C1.77206 6.16547 1.62692 5.7137 1.625 5.25V0.75C1.625 0.551088 1.54598 0.360322 1.40533 0.21967C1.26468 0.0790176 1.07391 0 0.875 0C0.676088 0 0.485322 0.0790176 0.34467 0.21967C0.204018 0.360322 0.125 0.551088 0.125 0.75V5.25C0.126091 6.11415 0.425068 6.95151 0.971539 7.62094C1.51801 8.29036 2.27856 8.75093 3.125 8.925V17.25C3.125 17.4489 3.20402 17.6397 3.34467 17.7803C3.48532 17.921 3.67609 18 3.875 18C4.07391 18 4.26468 17.921 4.40533 17.7803C4.54598 17.6397 4.625 17.4489 4.625 17.25V8.925C5.47144 8.75093 6.23199 8.29036 6.77846 7.62094C7.32493 6.95151 7.62391 6.11415 7.625 5.25V0.75C7.625 0.551088 7.54598 0.360322 7.40533 0.21967C7.26468 0.0790176 7.07391 0 6.875 0Z"></path>
-              </svg>
-              <div className="text3 flex items-center justify-between flex-1">
-                <div className="_88-7 text-sm">Самара, ул. Партизанская 88</div>
-                <div className="icons-16-angle-right ml-2">
-                  <svg width="7" height="12" viewBox="0 0 7 12" fill="currentColor">
-                    <path d="M4.72934 6.60887C4.80967 6.52919 4.87344 6.4344 4.91695 6.32995C4.96046 6.22551 4.98286 6.11348 4.98286 6.00033C4.98286 5.88719 4.96046 5.77516 4.91695 5.67071C4.87344 5.56627 4.80967 5.47147 4.72934 5.3918L0.79528 1.46631C0.714946 1.38663 0.651182 1.29184 0.607669 1.18739C0.564155 1.08295 0.541753 0.970919 0.541753 0.857773C0.541753 0.744626 0.564155 0.632599 0.607669 0.528154C0.651182 0.42371 0.714946 0.328914 0.79528 0.249236C0.955867 0.0896018 1.1731 0 1.39953 0C1.62596 0 1.84319 0.0896018 2.00378 0.249236L5.93784 4.18329C6.41936 4.66541 6.68982 5.31894 6.68982 6.00033C6.68982 6.68172 6.41936 7.33525 5.93784 7.81737L2.00378 11.7514C1.84414 11.9098 1.62867 11.999 1.40382 12C1.29102 12.0006 1.1792 11.979 1.07477 11.9364C0.970345 11.8937 0.875367 11.8309 0.79528 11.7514C0.714946 11.6717 0.651182 11.577 0.607669 11.4725C0.564155 11.3681 0.541753 11.256 0.541753 11.1429C0.541753 11.0297 0.564155 10.9177 0.607669 10.8133C0.651182 10.7088 0.714946 10.614 0.79528 10.5344L4.72934 6.60887Z"></path>
-                  </svg>
+          {/* Категории продуктов - основной блок */}
+          <div ref={categoriesRef}>
+            <Container className="px-3">
+              <div className="py-2">
+                <div className="d-flex overflow-auto gap-3">
+                  {categories.map(category => (
+                    <button
+                      key={category.id}
+                      className={`btn btn-sm ${activeCategory === category.id.toString() ? 'btn-primary text-white shadow' : 'btn-light'} px-3 py-2 text-nowrap`}
+                      onClick={() => handleCategoryChange(category.id.toString())}
+                    >
+                      {category.name}
+                    </button>
+                  ))}
                 </div>
               </div>
-            </div>
+            </Container>
           </div>
-
-          {/* Свайпер для акций */}
-          <div className="swiper-stocks mb-4">
-            <div className="stocks flex overflow-x-auto">
-              {[1, 2, 3, 4].map((_, index) => (
-                <div key={index} className="section-img flex-shrink-0 w-20 h-20 mr-2 rounded-lg overflow-hidden">
-                  <div className="img w-full h-full bg-gray-200"></div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Категории */}
-        <AnimatePresence>
-          {showCategories && (
-            <motion.div
-              initial={{ y: -20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -20, opacity: 0 }}
-              className="bg-gray-50 py-2 px-4 border-t border-gray-100"
-            >
-              <div className="category-swiper">
-                <div className="swiper-tabs">
-                  <div className="tabs flex overflow-x-auto">
-                    {categories.map(category => (
-                      <div
-                        key={category.id}
-                        className={`tab-item flex-shrink-0 px-4 py-2 rounded-full mr-2 ${
-                          activeCategory === category.id.toString()
-                            ? 'bg-white text-gray-900 font-medium shadow-sm'
-                            : 'text-gray-600'
-                        }`}
-                        onClick={() => setActiveCategory(category.id.toString())}
-                      >
-                        <span>{category.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </header>
+        </Container>
+      </motion.header>
 
       {/* Основной контент */}
-      <main className="px-4">
+      <Container className="px-3 pt-4" style={{ paddingBottom: '70px' }}>
         {products.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16">
-            <div className="text-6xl mb-4">🍔</div>
-            <h2 className="text-xl font-bold mb-2">Меню пусто</h2>
-            <p className="text-gray-600 text-center">В данный момент нет доступных блюд</p>
+          <div className="d-flex flex-column align-items-center justify-content-center py-5">
+            <div className="display-1 mb-4">🍔</div>
+            <h2 className="h4 mb-2 text-dark">Меню пусто</h2>
+            <p className="text-muted text-center">В данный момент нет доступных блюд</p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div>
             {productsByCategories.map(categorySection => (
-              <div key={categorySection.id} id={`category-${categorySection.id}`}>
+              <div key={categorySection.id} id={`category-${categorySection.id}`} className="mb-4">
                 {/* Заголовок категории */}
-                <div className="header-cat mb-4">
-                  <div className="header-cat--name text-lg font-bold text-gray-900">
-                    {categorySection.name}
-                  </div>
-                  {categorySection.description && (
-                    <div className="header-cat--description text-gray-600 text-sm">
-                      {categorySection.description}
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <h2 className="h4 fw-bold text-dark mb-0">{categorySection.name}</h2>
+                  {categorySection.name === 'Бугреры' && (
+                    <div className="d-flex gap-2">
+                      <div className="d-flex align-items-center">
+                        <small className="text-muted me-1">4.4</small>
+                        <i className="bi bi-star-fill text-warning" style={{ fontSize: '12px' }}></i>
+                      </div>
+                      <div className="d-flex align-items-center">
+                        <small className="text-muted me-1">4.8</small>
+                        <i className="bi bi-star-fill text-warning" style={{ fontSize: '12px' }}></i>
+                      </div>
                     </div>
                   )}
                 </div>
 
-                {/* Продукты категории */}
-                <div className="row-product grid grid-cols-2 gap-3">
-                  {categorySection.products.map(product => (
-                    <motion.div
-                      key={product.id}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      className="item-product bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
-                    >
-                      {/* Изображение продукта */}
-                      <div
-                        className="img3 h-40 bg-gray-200 relative"
-                        style={{
-                          background: product.image
-                            ? `url(${product.image}) center center / cover no-repeat`
-                            : 'center center / cover no-repeat'
-                        }}
-                      >
-                        <div className="functions absolute top-2 left-2 right-2 flex justify-between">
-                          <div className="left">
-                            <div className="rating flex items-center bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full">
-                              <div className="icons-12-rating mr-1">
-                                <span className="text-yellow-400">⭐</span>
-                              </div>
-                              <div className="count">
-                                <div className="text-xs font-medium">4.8</div>
+                {/* Продукты категории - 2 колонки */}
+                <Row className="g-3">
+                  {categorySection.products.map((product, index) => {
+                    const mainImageUrl = getFullImageUrl(product.main_image_url);
+                    const firstImageUrl = product.image_urls && product.image_urls.length > 0
+                      ? getFullImageUrl(product.image_urls[0])
+                      : null;
+                    const imageUrl = mainImageUrl || firstImageUrl;
+
+                    return (
+                      <Col key={product.id} xs={6}>
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                          className="card h-100 border shadow-sm"
+                          onClick={(e) => handleAddToCart(product, e)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          {/* Изображение с закругленными углами */}
+                          <div className="position-relative" style={{ height: '140px' }}>
+                            <div className="h-100 w-100 overflow-hidden rounded-top">
+                              <ProductImage src={imageUrl} alt={product.name} />
+                            </div>
+
+                            {/* Бейджи поверх изображения */}
+                            <div className="position-absolute top-0 start-0 end-0 p-2">
+                              <div className="d-flex flex-wrap gap-1">
+                                {getProductTags(product).map((tag, index) =>
+                                  renderBadge(tag, index)
+                                )}
                               </div>
                             </div>
                           </div>
-                          <div className="right">
-                            {/* Здесь могут быть другие функции */}
-                          </div>
-                        </div>
-                      </div>
 
-                      {/* Контент продукта */}
-                      <div className="content p-3">
-                        <div className="content-item-product">
-                          {/* Бейджи */}
-                          <div className="badges flex flex-wrap mb-2">
-                            {getProductTags(product).map((tag, index) =>
-                              renderBadge(tag, index)
-                            )}
-                          </div>
-
-                          {/* Название и описание */}
-                          <div className="text5">
-                            <div className="font-bold text-gray-900 mb-1 line-clamp-1">
+                          {/* Контент продукта */}
+                          <div className="card-body p-3">
+                            {/* Название товара - шрифт 16px, без горизонтальных отступов */}
+                            <h3
+                              className="card-title fw-bold text-dark mb-1"
+                              style={{
+                                fontSize: '16px',
+                                lineHeight: '1.3',
+                                paddingLeft: '0',
+                                paddingRight: '0'
+                              }}
+                            >
                               {product.name}
-                            </div>
-                            <div className="text-xs text-gray-600 line-clamp-2 min-h-[2.5rem]">
-                              {product.description}
-                            </div>
-                          </div>
-                        </div>
+                            </h3>
 
-                        {/* Цена и кнопка */}
-                        <div className="bottom mt-3 flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <div className="button-small">
-                              <div className="price font-bold text-gray-900">
-                                {Number(product.price).toFixed(2)} ₽
-                              </div>
-                            </div>
-                            {product.old_price && (
-                              <div className="old-price">
-                                <div className="old text-xs text-gray-500 line-through">
-                                  {Number(product.old_price).toFixed(2)} ₽
-                                </div>
-                              </div>
+                            {/* Описание товара - шрифт 12px, 2 строки, без горизонтальных отступов */}
+                            {product.description && (
+                              <p
+                                className="text-muted mb-2"
+                                style={{
+                                  fontSize: '12px',
+                                  lineHeight: '1.4',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
+                                  minHeight: '2.8em',
+                                  paddingLeft: '0',
+                                  paddingRight: '0'
+                                }}
+                                title={product.description}
+                              >
+                                {product.description}
+                              </p>
                             )}
-                          </div>
 
-                          <button
-                            className="bg-orange-500 hover:bg-orange-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-sm"
-                            onClick={() => handleAddToCart(product)}
-                          >
-                            <span className="text-lg">+</span>
-                          </button>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
+                            {/* Цена и кнопка добавления */}
+                            <div className="d-flex justify-content-between align-items-center mt-2" style={{ paddingLeft: '0', paddingRight: '0' }}>
+                              <div id={`price-${product.id}`} className="d-flex align-items-baseline gap-1">
+                                <span className="h5 fw-bold text-dark mb-0">
+                                  {Number(product.price).toFixed(0)} ₽
+                                </span>
+                                {product.old_price && (
+                                  <small className="text-muted text-decoration-line-through">
+                                    {Number(product.old_price).toFixed(0)} ₽
+                                  </small>
+                                )}
+                              </div>
+
+                              {/* Иконка добавления */}
+                              <div
+                                className="rounded-circle d-flex align-items-center justify-content-center"
+                                style={{
+                                  width: '32px',
+                                  height: '32px',
+                                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
+                                }}
+                              >
+                                <span className="text-white fw-bold">+</span>
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      </Col>
+                    );
+                  })}
+                </Row>
               </div>
             ))}
           </div>
         )}
-      </main>
+      </Container>
 
-      {/* Фиксированная панель корзины */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
-        <div className="px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-gray-600">Корзина</div>
-              <div className="text-xl font-bold text-gray-900">
-                {Number(subtotal).toFixed(2)} ₽
-              </div>
-            </div>
-
-            <button
-              className={`bg-orange-500 text-white px-6 py-3 rounded-xl font-bold flex items-center ${
-                totalItems === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-orange-600'
-              }`}
-              onClick={() => navigate('/cart')}
-              disabled={totalItems === 0}
-            >
-              <span className="mr-2">🛒</span>
-              {totalItems === 0 ? 'Корзина пуста' : `Оформить (${totalItems})`}
-            </button>
-          </div>
-        </div>
+      {/* Фиксированная кнопка корзины - компактная, синяя, с закруглением */}
+      <div className="fixed-bottom px-3 py-2" style={{ height: '50px' }}>
+        <button
+          className={`btn w-100 h-100 d-flex align-items-center justify-content-center rounded-3 shadow ${totalItems === 0 ? 'opacity-75' : ''}`}
+          onClick={() => totalItems > 0 && navigate('/cart')}
+          disabled={totalItems === 0}
+          style={{
+            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+            color: 'white',
+            fontSize: '16px',
+            fontWeight: '600',
+            border: 'none'
+          }}
+        >
+          <span>Корзина {Number(subtotal).toFixed(0)} ₽</span>
+        </button>
       </div>
     </div>
   );

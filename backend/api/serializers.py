@@ -5,7 +5,7 @@ from restaurants.models import Restaurant, RestaurantBranch
 from catalog.models import Category, Product, Tag, ProductOption, OptionValue
 from orders.models import Order, OrderItem, Cart, CartItem, PromoCode, BonusRule, UserBonusTransaction
 from payments.models import Payment
-
+from django.conf import settings
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -234,8 +234,11 @@ class ProductSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', allow_null=True)
     restaurant_name = serializers.CharField(source='restaurant.name', allow_null=True)
     tags = TagSerializer(many=True, read_only=True)
-    options = serializers.SerializerMethodField()
     in_stock = serializers.SerializerMethodField()
+
+    # Добавляем поле для полного URL изображения
+    main_image_url_full = serializers.SerializerMethodField()
+    image_urls_full = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -243,18 +246,28 @@ class ProductSerializer(serializers.ModelSerializer):
             'id', 'name', 'description', 'short_description', 'price',
             'old_price', 'category', 'category_name', 'restaurant',
             'restaurant_name', 'weight_grams', 'calories', 'main_image_url',
-            'image_urls', 'is_popular', 'is_new', 'is_recommended',
+            'main_image_url_full', 'image_urls', 'image_urls_full',
+            'is_popular', 'is_new', 'is_recommended',
             'is_vegetarian', 'is_vegan', 'is_gluten_free', 'tags',
-            'options', 'in_stock', 'cooking_time_minutes', 'stock_quantity'
+            'in_stock', 'cooking_time_minutes', 'stock_quantity'
         ]
 
-    def get_options(self, obj):
-        # Return the options available for this product
-        # This requires defining a reverse relation in models
-        from catalog.models import ProductOptionMapping
-        option_mappings = ProductOptionMapping.objects.filter(product=obj).select_related('option')
-        options = [mapping.option for mapping in option_mappings]
-        return ProductOptionSerializer(options, many=True, context=self.context).data
+    def get_main_image_url_full(self, obj):
+        if obj.main_image_url:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.main_image_url)
+            return f"{settings.SITE_URL}{obj.main_image_url}" if hasattr(settings, 'SITE_URL') else obj.main_image_url
+        return None
+
+    def get_image_urls_full(self, obj):
+        if obj.image_urls:
+            request = self.context.get('request')
+            if request:
+                return [request.build_absolute_uri(url) for url in obj.image_urls]
+            elif hasattr(settings, 'SITE_URL'):
+                return [f"{settings.SITE_URL}{url}" for url in obj.image_urls]
+        return obj.image_urls or []
 
     def get_in_stock(self, obj):
         if obj.is_unlimited_stock:
