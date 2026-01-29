@@ -1,57 +1,57 @@
-
 // API service for admin panel
 import axios from 'axios';
 import { env } from '../config/env';
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: env.REACT_APP_API_URL || '/api/', // Use environment variable or default - API is under /api/v1
+  baseURL: env.REACT_APP_API_URL || 'http://localhost:8000/api/',
   timeout: 10000,
+  withCredentials: true,
 });
 
-// Function to get CSRF token
-export const getCsrfToken = async (): Promise<string> => {
-  try {
-    // Use a separate axios instance to get CSRF token since it might have different base URL requirements
-    const csrfAxios = axios.create({
-      baseURL: env.REACT_APP_API_URL || '/api/',
-      withCredentials: true
-    });
-    const response = await csrfAxios.get('auth/csrf/');
-    return response.data.csrfToken;
-  } catch (error) {
-    console.error('Error getting CSRF token:', error);
-    // Return empty string if CSRF token is not available
-    return '';
-  }
+// Убираем CSRF логику, так как она вызывает 404
+// Для сессионной аутентификации Django обычно использует csrftoken из куки
+// Добавляем только заголовок X-CSRFToken, если токен есть в куках
+
+// Функция для получения CSRF токена из куки
+const getCsrfTokenFromCookie = (): string | null => {
+  const name = 'csrftoken';
+  const cookieValue = document.cookie
+    .split('; ')
+    .find(row => row.startsWith(`${name}=`))
+    ?.split('=')[1];
+  return cookieValue || null;
 };
 
-// Store CSRF token
-let csrfToken: string | null = null;
-
-// Add request interceptor to include credentials and CSRF token (for session authentication)
+// Add request interceptor to include CSRF token
 api.interceptors.request.use(
-  async (config) => {
-    // Include credentials (cookies) for session authentication
-    config.withCredentials = true;
-
-    // Add CSRF token to headers for mutating requests
+  (config) => {
+    // Добавляем CSRF токен только для мутирующих запросов
     if (['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase() || '')) {
-      if (!csrfToken) {
-        csrfToken = await getCsrfToken();
-      }
-
+      const csrfToken = getCsrfTokenFromCookie();
       if (csrfToken) {
         config.headers['X-CSRFToken'] = csrfToken;
       }
     }
-
     return config;
   },
   (error) => {
     return Promise.reject(error);
   }
 );
+
+// Add response interceptor to handle errors
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      // Handle unauthorized access - redirect to login
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
 
 // Add response interceptor to handle errors
 api.interceptors.response.use(
@@ -115,13 +115,14 @@ export const menuAPI = {
 
 // Users API endpoints
 export const usersAPI = {
-  getAll: (params?: any) => api.get('/users', params),
-  getById: (id: number) => api.get(`/users/${id}`),
+  getAll: (params?: any) => api.get('/users/', params),  // добавил слэш в конце
+  getById: (id: number) => api.get(`/users/${id}/`),
   update: (id: number, data: any) => api.put(`/users/${id}/`, data),
-  bulkUpdate: (ids: number[], data: any) => api.put('/users/bulk/', { ids, data }),
+  bulkUpdate: (ids: number[], data: any) => api.put('/users/bulk_action/', { ids, ...data }), // изменил путь
   create: (data: any) => api.post('/users/', data),
   delete: (id: number) => api.delete(`/users/${id}/`),
   toggleBlock: (id: number, blocked: boolean) => api.patch(`/users/${id}/block/`, { blocked }),
+  bulkAction: (ids: number[], action: string) => api.post('/users/bulk_action/', { ids, action }), // добавил новый метод
 };
 
 // Restaurants API endpoints

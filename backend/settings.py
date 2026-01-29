@@ -269,3 +269,8 @@ LOGGING = {
         },
     },
 }
+
+# Для session authentication
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = False  # Для разработки, в production должно быть True

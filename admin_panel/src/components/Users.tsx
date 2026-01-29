@@ -1,78 +1,116 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
   Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   TextField,
   Button,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Chip,
   Tabs,
   Tab,
   IconButton,
   Checkbox,
   Avatar,
+  InputAdornment,
+  CircularProgress,
 } from '@mui/material';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
 import PersonIcon from '@mui/icons-material/Person';
 import EmailIcon from '@mui/icons-material/Email';
 import PhoneIcon from '@mui/icons-material/Phone';
 import EditIcon from '@mui/icons-material/Edit';
 import SendIcon from '@mui/icons-material/Send';
+import SearchIcon from '@mui/icons-material/Search';
 import { usersAPI } from '../services/api';
+import { useDebounce } from '@mui/material'; // Или useDebouncedCallback
 
 interface User {
   id: number;
-  telegramId: string;
+  telegram_id: string;
   username: string;
-  firstName: string;
-  lastName: string;
+  first_name: string;
+  last_name: string;
   phone: string;
   email: string;
-  registrationDate: string;
-  orderCount: number;
-  totalSpent: number;
-  bonusBalance: number;
-  isActive: boolean;
-  isBlocked: boolean;
+  registration_date: string;
+  total_orders: number;
+  total_spent: number;
+  bonus_balance: number;
+  is_active: boolean;
+  is_blocked: boolean;
 }
 
 const Users = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        // Using API service to fetch real data
-        const response = await usersAPI.getAll();
-        setUsers(response.data);
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching users:', error);
-        setLoading(false);
-      }
-    };
-
-    fetchUsers();
-  }, []);
-
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [currentTab, setCurrentTab] = useState(0);
   const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
-  const [currentTab, setCurrentTab] = useState(0);
+  const [paginationModel, setPaginationModel] = useState({
+    page: 0,
+    pageSize: 10,
+  });
+
+  // Используем useDebounce для задержки поиска
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      setPaginationModel(prev => ({ ...prev, page: 0 }));
+    }, 500);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [searchQuery]);
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      const params: any = {
+        page: paginationModel.page + 1,
+        limit: paginationModel.pageSize,
+      };
+
+      // Добавляем поисковый запрос
+      if (debouncedSearchQuery.trim()) {
+        params.search = debouncedSearchQuery.trim();
+      }
+
+      // Добавляем фильтр по вкладке
+      const statusMap = ['all', 'active', 'blocked', 'new'];
+      const status = statusMap[currentTab];
+      if (status !== 'all') {
+        params.status = status;
+      }
+
+      const response = await usersAPI.getAll(params);
+      setUsers(response.data.results || response.data);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      setLoading(false);
+    }
+  }, [debouncedSearchQuery, currentTab, paginationModel]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  const handleSearch = (value: string) => {
+    setSearchQuery(value);
+  };
+
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setCurrentTab(newValue);
+    setPaginationModel(prev => ({ ...prev, page: 0 }));
+  };
 
   const columns: GridColDef[] = [
     {
@@ -102,34 +140,59 @@ const Users = () => {
         </Avatar>
       )
     },
-    { field: 'firstName', headerName: 'Имя', width: 150 },
-    { field: 'lastName', headerName: 'Фамилия', width: 150 },
+    { field: 'first_name', headerName: 'Имя', width: 150 },
+    { field: 'last_name', headerName: 'Фамилия', width: 150 },
     { field: 'username', headerName: 'Username', width: 150 },
     { field: 'phone', headerName: 'Телефон', width: 150 },
     { field: 'email', headerName: 'Email', width: 200 },
-    { field: 'registrationDate', headerName: 'Регистрация', width: 120 },
-    { field: 'orderCount', headerName: 'Заказы', width: 100 },
-    { field: 'totalSpent', headerName: 'Потрачено', width: 120, valueFormatter: (params) => `${params.value}₽` },
-    { field: 'bonusBalance', headerName: 'Бонусы', width: 120, valueFormatter: (params) => `${params.value} баллов` },
     {
-      field: 'isActive',
+      field: 'registration_date',
+      headerName: 'Регистрация',
+      width: 120,
+      valueFormatter: (params) => {
+        const date = new Date(params.value);
+        return date.toLocaleDateString();
+      }
+    },
+    {
+      field: 'total_orders',
+      headerName: 'Заказы',
+      width: 100,
+      valueFormatter: (params) => params.value || 0
+    },
+    {
+      field: 'total_spent',
+      headerName: 'Потрачено',
+      width: 120,
+      valueFormatter: (params) => `${parseFloat(params.value) || 0}₽`
+    },
+    {
+      field: 'bonus_balance',
+      headerName: 'Бонусы',
+      width: 120,
+      valueFormatter: (params) => `${parseFloat(params.value) || 0} баллов`
+    },
+    {
+      field: 'is_active',
       headerName: 'Активен',
       width: 100,
       renderCell: (params) => (
         <Chip
           label={params.value ? 'Да' : 'Нет'}
           color={params.value ? 'success' : 'default'}
+          size="small"
         />
       )
     },
     {
-      field: 'isBlocked',
+      field: 'is_blocked',
       headerName: 'Заблокирован',
       width: 120,
       renderCell: (params) => (
         <Chip
           label={params.value ? 'Да' : 'Нет'}
           color={params.value ? 'error' : 'default'}
+          size="small"
         />
       )
     },
@@ -150,29 +213,49 @@ const Users = () => {
     },
   ];
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     console.log('Send message to users:', selectedUsers);
     setSelectedUsers([]);
   };
 
-  const handleBlockUsers = () => {
-    console.log('Block users:', selectedUsers);
-    setSelectedUsers([]);
+  const handleBlockUsers = async () => {
+    try {
+      await usersAPI.bulkAction(selectedUsers, 'block');
+      await fetchUsers();
+      setSelectedUsers([]);
+    } catch (error) {
+      console.error('Error blocking users:', error);
+    }
   };
 
-  const handleUnblockUsers = () => {
-    console.log('Unblock users:', selectedUsers);
-    setSelectedUsers([]);
+  const handleUnblockUsers = async () => {
+    try {
+      await usersAPI.bulkAction(selectedUsers, 'unblock');
+      await fetchUsers();
+      setSelectedUsers([]);
+    } catch (error) {
+      console.error('Error unblocking users:', error);
+    }
   };
 
-  const handleActivateUsers = () => {
-    console.log('Activate users:', selectedUsers);
-    setSelectedUsers([]);
+  const handleActivateUsers = async () => {
+    try {
+      await usersAPI.bulkAction(selectedUsers, 'activate');
+      await fetchUsers();
+      setSelectedUsers([]);
+    } catch (error) {
+      console.error('Error activating users:', error);
+    }
   };
 
-  const handleDeactivateUsers = () => {
-    console.log('Deactivate users:', selectedUsers);
-    setSelectedUsers([]);
+  const handleDeactivateUsers = async () => {
+    try {
+      await usersAPI.bulkAction(selectedUsers, 'deactivate');
+      await fetchUsers();
+      setSelectedUsers([]);
+    } catch (error) {
+      console.error('Error deactivating users:', error);
+    }
   };
 
   const handleAddUser = () => {
@@ -183,9 +266,18 @@ const Users = () => {
     setOpenDialog(false);
   };
 
-  const handleSubmit = () => {
-    // Handle form submission
-    setOpenDialog(false);
+  const handleSubmit = async () => {
+    try {
+      // Handle form submission
+      setOpenDialog(false);
+      await fetchUsers();
+    } catch (error) {
+      console.error('Error creating user:', error);
+    }
+  };
+
+  const handleRowSelection = (rowSelectionModel: GridRowSelectionModel) => {
+    setSelectedUsers(rowSelectionModel as number[]);
   };
 
   return (
@@ -200,9 +292,18 @@ const Users = () => {
           label="Поиск по имени, телефону, email..."
           variant="outlined"
           sx={{ mb: 2 }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+          onChange={(e) => handleSearch(e.target.value)}
+          value={searchQuery}
         />
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Tabs value={currentTab} onChange={(e, newValue) => setCurrentTab(newValue)}>
+          <Tabs value={currentTab} onChange={handleTabChange}>
             <Tab label="Все" />
             <Tab label="Активные" />
             <Tab label="Заблокированные" />
@@ -215,12 +316,25 @@ const Users = () => {
       </Paper>
 
       <Paper sx={{ height: 600, width: '100%' }}>
-        <DataGrid
-          rows={users}
-          columns={columns}
-          pageSize={10}
-          rowsPerPageOptions={[5, 10, 20]}
-        />
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <DataGrid
+            rows={users}
+            columns={columns}
+            pageSizeOptions={[5, 10, 20]}
+            paginationModel={paginationModel}
+            onPaginationModelChange={setPaginationModel}
+            paginationMode="server"
+            rowCount={users.length}
+            loading={loading}
+            checkboxSelection
+            onRowSelectionModelChange={handleRowSelection}
+            rowSelectionModel={selectedUsers}
+          />
+        )}
       </Paper>
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1, boxShadow: 1 }}>
@@ -237,10 +351,10 @@ const Users = () => {
           <Button variant="outlined" color="success" onClick={handleUnblockUsers} sx={{ ml: 1 }} disabled={selectedUsers.length === 0}>
             Разблокировать
           </Button>
-          <Button variant="outlined" onClick={handleActivateUsers} sx={{ ml: 1 }} disabled={selectedUsers.length === 0}>
+          <Button variant="outlined" color="success" onClick={handleActivateUsers} sx={{ ml: 1 }} disabled={selectedUsers.length === 0}>
             Активировать
           </Button>
-          <Button variant="outlined" onClick={handleDeactivateUsers} sx={{ ml: 1 }} disabled={selectedUsers.length === 0}>
+          <Button variant="outlined" color="error" onClick={handleDeactivateUsers} sx={{ ml: 1 }} disabled={selectedUsers.length === 0}>
             Деактивировать
           </Button>
         </Box>
@@ -257,6 +371,7 @@ const Users = () => {
               fullWidth
               variant="outlined"
               sx={{ mb: 2 }}
+              required
             />
             <TextField
               margin="dense"
@@ -271,6 +386,7 @@ const Users = () => {
               fullWidth
               variant="outlined"
               sx={{ mb: 2 }}
+              required
             />
             <TextField
               margin="dense"
@@ -285,6 +401,7 @@ const Users = () => {
               fullWidth
               variant="outlined"
               sx={{ mb: 2 }}
+              required
             />
             <TextField
               margin="dense"
@@ -292,6 +409,7 @@ const Users = () => {
               fullWidth
               variant="outlined"
               sx={{ mb: 2 }}
+              required
             />
           </Box>
         </DialogContent>

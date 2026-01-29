@@ -30,7 +30,7 @@ from .serializers import (
     RestaurantBranchSerializer, CategorySerializer, ProductSerializer,
     TagSerializer, OrderSerializer, CartSerializer, PromoCodeSerializer,
     BonusRuleSerializer, UserBonusTransactionSerializer, AdminRestaurantSerializer,
-    ProductCreateUpdateSerializer
+    ProductCreateUpdateSerializer,
 )
 from .authentication import TelegramAuthentication
 
@@ -1360,3 +1360,105 @@ class AdminRestaurantViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         return super().destroy(request, *args, **kwargs)
+
+
+class UserViewSet(viewsets.ModelViewSet):
+    """
+    Управление пользователями для администраторов
+    """
+    from django.db.models import Q
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        """
+        Разрешаем доступ только администраторам
+        """
+        from rest_framework.permissions import IsAdminUser
+
+        # Для любых действий требуем права администратора
+        permission_classes = [IsAuthenticated, IsAdminUser]
+        return [permission() for permission in permission_classes]
+
+    def get_queryset(self):
+        """
+        Фильтрация пользователей по статусу
+        """
+        queryset = User.objects.all()
+
+        # Получаем параметры фильтрации из запроса
+        status = self.request.query_params.get('status', 'all')
+        search = self.request.query_params.get('search', '')
+
+        # Применяем фильтры
+        if search:
+            queryset = queryset.filter(
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search) |
+                Q(phone__icontains=search) |
+                Q(email__icontains=search) |
+                Q(username__icontains=search) |
+                Q(telegram_id__icontains=search)
+            )
+
+        if status == 'active':
+            queryset = queryset.filter(is_active=True, is_blocked=False)
+        elif status == 'blocked':
+            queryset = queryset.filter(is_blocked=True)
+        elif status == 'new':
+            # Новые пользователи за последние 7 дней
+            week_ago = timezone.now() - timedelta(days=7)
+            queryset = queryset.filter(created_at__gte=week_ago)
+
+        return queryset.order_by('-created_at')
+
+    @action(detail=True, methods=['patch'])
+    def block(self, request, pk=None):
+        """
+        Блокировка/разблокировка пользователя
+        """
+        user = self.get_object()
+        blocked = request.data.get('blocked', True)
+        user.is_blocked = blocked
+        user.save()
+        return Response({'status': 'blocked' if blocked else 'unblocked'})
+
+    @action(detail=True, methods=['patch'])
+    def activate(self, request, pk=None):
+        """
+        Активация/деактивация пользователя
+        """
+        user = self.get_object()
+        active = request.data.get('active', True)
+        user.is_active = active
+        user.save()
+        return Response({'status': 'activated' if active else 'deactivated'})
+
+    @action(detail=False, methods=['post'])
+    def bulk_action(self, request):
+        """
+        Массовые действия с пользователями
+        """
+        ids = request.data.get('ids', [])
+        action_type = request.data.get('action', '')
+
+        if not ids:
+            return Response({'error': 'No users selected'}, status=400)
+
+        users = User.objects.filter(id__in=ids)
+
+        if action_type == 'block':
+            users.update(is_blocked=True)
+            return Response({'status': 'users blocked'})
+        elif action_type == 'unblock':
+            users.update(is_blocked=False)
+            return Response({'status': 'users unblocked'})
+        elif action_type == 'activate':
+            users.update(is_active=True)
+            return Response({'status': 'users activated'})
+        elif action_type == 'deactivate':
+            users.update(is_active=False)
+            return Response({'status': 'users deactivated'})
+
+        return Response({'error': 'Invalid action'}, status=400)

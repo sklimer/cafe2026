@@ -11,8 +11,6 @@ import {
   CircularProgress,
   CssBaseline,
   Avatar,
-  Grid,
-  Link,
 } from '@mui/material';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { useAuth } from '../contexts/AuthContext';
@@ -21,88 +19,57 @@ const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, login } = useAuth();
+  const { user, loading: authLoading, login } = useAuth();
 
   const from = (location.state as any)?.from?.pathname || '/dashboard';
 
   // Эффект для перенаправления при изменении пользователя
   useEffect(() => {
-    console.log('[LOGIN PAGE] Текущий пользователь:', user);
-    console.log('[LOGIN PAGE] Состояние location:', location);
-    console.log('[LOGIN PAGE] Перенаправление на:', from);
-
-    if (user) {
-      console.log('[LOGIN PAGE] Пользователь найден, перенаправление в:', from);
-      console.log('[LOGIN PAGE] Данные пользователя:', {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        is_staff: user.is_staff
-      });
-
-      // Добавляем небольшую задержку для уверенности, что состояние обновилось
-      const redirectTimer = setTimeout(() => {
-        navigate(from, { replace: true });
-      }, 100);
-
-      return () => clearTimeout(redirectTimer);
+    if (user && !authLoading) {
+      console.log('Пользователь найден, перенаправление в:', from);
+      navigate(from, { replace: true });
     }
-  }, [user, navigate, from, location]);
+  }, [user, authLoading, navigate, from]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setIsSubmitting(true);
     setError('');
-
-    console.log('[LOGIN PAGE] Начало входа', { username });
 
     try {
       const success = await login(username, password);
-      console.log('[LOGIN PAGE] Результат входа:', success);
-
-      if (success) {
-        console.log('[LOGIN PAGE] Вход успешен, должен произойти редирект через useEffect');
-        // Не вызываем navigate здесь, это сделает useEffect
-        // navigate(from, { replace: true });
-      } else {
+      if (!success) {
         setError('Неверное имя пользователя или пароль');
-        console.log('[LOGIN PAGE] Вход не удался');
       }
-    } catch (err) {
+    } catch (err: any) {
+      console.error('Ошибка при входе:', err);
       setError('Произошла ошибка при входе');
-      console.error('[LOGIN PAGE] Ошибка при входе:', err);
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  // Если пользователь уже авторизован, показываем сообщение о перенаправлении
+  // Если идет загрузка аутентификации
+  if (authLoading) {
+    return (
+      <Container component="main" maxWidth="xs">
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+          <CircularProgress />
+        </Box>
+      </Container>
+    );
+  }
+
+  // Если пользователь уже авторизован
   if (user) {
     return (
       <Container component="main" maxWidth="xs">
-        <Box
-          sx={{
-            marginTop: 8,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-          }}
-        >
-          <Avatar sx={{ m: 1, bgcolor: 'secondary.main' }}>
-            <LockOutlinedIcon />
-          </Avatar>
-          <Typography component="h1" variant="h5">
-            Перенаправление...
-          </Typography>
-          <Paper elevation={3} sx={{ p: 4, mt: 3, width: '100%', textAlign: 'center' }}>
-            <CircularProgress sx={{ mb: 2 }} />
-            <Typography variant="body1">
-              Вы уже авторизованы. Перенаправляем на дашборд...
-            </Typography>
-          </Paper>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+          <CircularProgress />
+          <Typography sx={{ ml: 2 }}>Перенаправление...</Typography>
         </Box>
       </Container>
     );
@@ -146,7 +113,7 @@ const Login = () => {
                 autoFocus
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                disabled={loading}
+                disabled={isSubmitting}
               />
               <TextField
                 margin="normal"
@@ -159,7 +126,7 @@ const Login = () => {
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                disabled={loading}
+                disabled={isSubmitting}
               />
 
               <Button
@@ -167,29 +134,12 @@ const Login = () => {
                 fullWidth
                 variant="contained"
                 sx={{ mt: 3, mb: 2 }}
-                disabled={loading}
+                disabled={isSubmitting}
               >
-                {loading ? <CircularProgress size={24} /> : 'Войти'}
+                {isSubmitting ? <CircularProgress size={24} /> : 'Войти'}
               </Button>
-
-              <Grid container>
-                <Grid item xs>
-                  <Link href="#" variant="body2">
-                    Забыли пароль?
-                  </Link>
-                </Grid>
-              </Grid>
             </Box>
           </Paper>
-
-          <Box sx={{ mt: 3, textAlign: 'center' }}>
-            <Typography variant="body2" color="text.secondary">
-              Используйте данные суперпользователя Django
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Команда для создания: python manage.py createsuperuser
-            </Typography>
-          </Box>
         </Box>
       </Container>
     </>

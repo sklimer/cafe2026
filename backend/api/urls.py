@@ -29,6 +29,8 @@ router.register(r'orders', views.OrderViewSet, basename='order')
 # User endpoints
 router.register(r'addresses', views.UserAddressViewSet, basename='address')
 
+router.register(r'users', views.UserViewSet, basename='user')
+
 urlpatterns = [
     path('', include(router.urls)),
     # авторизация для кастомной админки
