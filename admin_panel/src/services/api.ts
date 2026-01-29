@@ -1,3 +1,4 @@
+
 // API service for admin panel
 import axios from 'axios';
 import { env } from '../config/env';
@@ -44,22 +45,14 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Don't redirect on auth check failures as this causes infinite loops
     if (error.response?.status === 401 || error.response?.status === 403) {
-      // Handle unauthorized access - redirect to login
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
-
-
-// Add response interceptor to handle errors
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401 || error.response?.status === 403) {
-      // Handle unauthorized access - redirect to login
-      window.location.href = '/login';
+      // Only redirect to login for non-auth endpoints
+      const url = error.config?.url || '';
+      if (!url.includes('/auth/check/')) {
+        // Handle unauthorized access - redirect to login
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

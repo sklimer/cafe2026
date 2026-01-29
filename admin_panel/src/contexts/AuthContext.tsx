@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import api from '../services/api'; // Импортируем готовый api инстанс
 
@@ -69,19 +70,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const response = await api.get('/auth/check/');
 
-      if (response.data.authenticated && response.data.user) {
+      if (response.data.authenticated && response.data.user && response.data.user.is_staff) {
         const serverUser = response.data.user;
 
         if (!serverUser.username) {
           serverUser.username = serverUser.email || `user_${serverUser.id}`;
         }
 
-        console.log('Пользователь авторизован:', serverUser.username);
+        console.log('Администратор авторизован:', serverUser.username);
         setUser(serverUser);
         localStorage.setItem(LOCAL_STORAGE_KEYS.USER, JSON.stringify(serverUser));
         localStorage.setItem(LOCAL_STORAGE_KEYS.LAST_AUTH_CHECK, new Date().toISOString());
       } else {
-        console.log('Пользователь не авторизован');
+        console.log('Пользователь не является администратором или не авторизован');
         setUser(null);
         localStorage.removeItem(LOCAL_STORAGE_KEYS.USER);
       }
@@ -103,20 +104,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         username,
         password,
       });
-
-      if (response.data.success && response.data.user) {
+      console.log('Вход response.data.user.is_staff:', response.data.user.is_staff)
+      console.log('Вход response.data.user:', response.data.user)
+      console.log('Вход response.data.success:', response.data.success)
+      if (response.data.success && response.data.user && response.data.user.is_staff) {
         const serverUser = response.data.user;
 
         if (!serverUser.username) {
           serverUser.username = serverUser.email || `user_${serverUser.id}`;
         }
 
-        console.log('Вход выполнен успешно:', serverUser.username);
+        console.log('Вход администратора выполнен успешно:', serverUser.username);
         setUser(serverUser);
         localStorage.setItem(LOCAL_STORAGE_KEYS.USER, JSON.stringify(serverUser));
         localStorage.setItem(LOCAL_STORAGE_KEYS.LAST_AUTH_CHECK, new Date().toISOString());
         return true;
       } else {
+        if (!response.data.user?.is_staff) {
+          console.log('Вход не удался: пользователь не является администратором');
+        }
         console.log('Вход не удался (сервер вернул false)');
         return false;
       }

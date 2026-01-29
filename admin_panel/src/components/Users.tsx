@@ -17,16 +17,19 @@ import {
   Avatar,
   InputAdornment,
   CircularProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TablePagination,
 } from '@mui/material';
-import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
 import PersonIcon from '@mui/icons-material/Person';
-import EmailIcon from '@mui/icons-material/Email';
-import PhoneIcon from '@mui/icons-material/Phone';
 import EditIcon from '@mui/icons-material/Edit';
 import SendIcon from '@mui/icons-material/Send';
 import SearchIcon from '@mui/icons-material/Search';
 import { usersAPI } from '../services/api';
-import { useDebounce } from '@mui/material'; // Или useDebouncedCallback
 
 interface User {
   id: number;
@@ -46,41 +49,27 @@ interface User {
 
 const Users = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [currentTab, setCurrentTab] = useState(0);
   const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
-  const [paginationModel, setPaginationModel] = useState({
-    page: 0,
-    pageSize: 10,
-  });
-
-  // Используем useDebounce для задержки поиска
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-      setPaginationModel(prev => ({ ...prev, page: 0 }));
-    }, 500);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [searchQuery]);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
 
       const params: any = {
-        page: paginationModel.page + 1,
-        limit: paginationModel.pageSize,
+        page: 1,
+        limit: 1000, // Загружаем все данные для локальной фильтрации
       };
 
       // Добавляем поисковый запрос
-      if (debouncedSearchQuery.trim()) {
-        params.search = debouncedSearchQuery.trim();
+      if (searchQuery.trim()) {
+        params.search = searchQuery.trim();
       }
 
       // Добавляем фильтр по вкладке
@@ -91,127 +80,49 @@ const Users = () => {
       }
 
       const response = await usersAPI.getAll(params);
-      setUsers(response.data.results || response.data);
+
+      // Обрабатываем данные в зависимости от структуры ответа
+      let fetchedUsers: User[] = [];
+      if (response.data && Array.isArray(response.data.results)) {
+        fetchedUsers = response.data.results;
+      } else if (response.data && Array.isArray(response.data.users)) {
+        fetchedUsers = response.data.users;
+      } else if (Array.isArray(response.data)) {
+        fetchedUsers = response.data;
+      } else if (response.data && Array.isArray(response.data)) {
+        fetchedUsers = response.data;
+      }
+
+      setUsers(fetchedUsers);
+      setFilteredUsers(fetchedUsers);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching users:', error);
+      setUsers([]);
+      setFilteredUsers([]);
       setLoading(false);
     }
-  }, [debouncedSearchQuery, currentTab, paginationModel]);
+  }, [searchQuery, currentTab]);
 
   useEffect(() => {
-    fetchUsers();
+    const timer = setTimeout(() => {
+      fetchUsers();
+    }, 500);
+
+    return () => {
+      clearTimeout(timer);
+    };
   }, [fetchUsers]);
 
   const handleSearch = (value: string) => {
     setSearchQuery(value);
+    setPage(0); // Сбрасываем на первую страницу при поиске
   };
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setCurrentTab(newValue);
-    setPaginationModel(prev => ({ ...prev, page: 0 }));
+    setPage(0); // Сбрасываем на первую страницу при смене вкладки
   };
-
-  const columns: GridColDef[] = [
-    {
-      field: 'checkbox',
-      headerName: '',
-      width: 50,
-      renderCell: (params) => (
-        <Checkbox
-          checked={selectedUsers.includes(params.row.id)}
-          onChange={(e) => {
-            if (e.target.checked) {
-              setSelectedUsers([...selectedUsers, params.row.id]);
-            } else {
-              setSelectedUsers(selectedUsers.filter(id => id !== params.row.id));
-            }
-          }}
-        />
-      )
-    },
-    {
-      field: 'avatar',
-      headerName: 'Аватар',
-      width: 60,
-      renderCell: () => (
-        <Avatar>
-          <PersonIcon />
-        </Avatar>
-      )
-    },
-    { field: 'first_name', headerName: 'Имя', width: 150 },
-    { field: 'last_name', headerName: 'Фамилия', width: 150 },
-    { field: 'username', headerName: 'Username', width: 150 },
-    { field: 'phone', headerName: 'Телефон', width: 150 },
-    { field: 'email', headerName: 'Email', width: 200 },
-    {
-      field: 'registration_date',
-      headerName: 'Регистрация',
-      width: 120,
-      valueFormatter: (params) => {
-        const date = new Date(params.value);
-        return date.toLocaleDateString();
-      }
-    },
-    {
-      field: 'total_orders',
-      headerName: 'Заказы',
-      width: 100,
-      valueFormatter: (params) => params.value || 0
-    },
-    {
-      field: 'total_spent',
-      headerName: 'Потрачено',
-      width: 120,
-      valueFormatter: (params) => `${parseFloat(params.value) || 0}₽`
-    },
-    {
-      field: 'bonus_balance',
-      headerName: 'Бонусы',
-      width: 120,
-      valueFormatter: (params) => `${parseFloat(params.value) || 0} баллов`
-    },
-    {
-      field: 'is_active',
-      headerName: 'Активен',
-      width: 100,
-      renderCell: (params) => (
-        <Chip
-          label={params.value ? 'Да' : 'Нет'}
-          color={params.value ? 'success' : 'default'}
-          size="small"
-        />
-      )
-    },
-    {
-      field: 'is_blocked',
-      headerName: 'Заблокирован',
-      width: 120,
-      renderCell: (params) => (
-        <Chip
-          label={params.value ? 'Да' : 'Нет'}
-          color={params.value ? 'error' : 'default'}
-          size="small"
-        />
-      )
-    },
-    {
-      field: 'actions',
-      headerName: 'Действия',
-      width: 120,
-      renderCell: (params) => (
-        <>
-          <IconButton size="small" onClick={() => console.log('Edit', params.row.id)}>
-            <EditIcon />
-          </IconButton>
-          <IconButton size="small" onClick={() => console.log('Send message', params.row.id)}>
-            <SendIcon />
-          </IconButton>
-        </>
-      )
-    },
-  ];
 
   const handleSendMessage = async () => {
     console.log('Send message to users:', selectedUsers);
@@ -276,9 +187,46 @@ const Users = () => {
     }
   };
 
-  const handleRowSelection = (rowSelectionModel: GridRowSelectionModel) => {
-    setSelectedUsers(rowSelectionModel as number[]);
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
   };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  const handleSelectUser = (userId: number) => {
+    setSelectedUsers(prev => {
+      if (prev.includes(userId)) {
+        return prev.filter(id => id !== userId);
+      } else {
+        return [...prev, userId];
+      }
+    });
+  };
+
+  const handleSelectAll = () => {
+    const currentPageUsers = filteredUsers.slice(
+      page * rowsPerPage,
+      page * rowsPerPage + rowsPerPage
+    );
+
+    if (selectedUsers.length === currentPageUsers.length) {
+      // Если все выбраны, снимаем выделение
+      setSelectedUsers([]);
+    } else {
+      // Выбираем всех пользователей на текущей странице
+      const pageUserIds = currentPageUsers.map(user => user.id);
+      setSelectedUsers(pageUserIds);
+    }
+  };
+
+  // Получаем пользователей для текущей страницы
+  const displayedUsers = filteredUsers.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
 
   return (
     <Box sx={{ flexGrow: 1 }}>
@@ -315,25 +263,112 @@ const Users = () => {
         </Box>
       </Paper>
 
-      <Paper sx={{ height: 600, width: '100%' }}>
+      <Paper sx={{ width: '100%', overflow: 'hidden' }}>
         {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
             <CircularProgress />
           </Box>
         ) : (
-          <DataGrid
-            rows={users}
-            columns={columns}
-            pageSizeOptions={[5, 10, 20]}
-            paginationModel={paginationModel}
-            onPaginationModelChange={setPaginationModel}
-            paginationMode="server"
-            rowCount={users.length}
-            loading={loading}
-            checkboxSelection
-            onRowSelectionModelChange={handleRowSelection}
-            rowSelectionModel={selectedUsers}
-          />
+          <>
+            <TableContainer sx={{ maxHeight: 540 }}>
+              <Table stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        indeterminate={selectedUsers.length > 0 && selectedUsers.length < displayedUsers.length}
+                        checked={displayedUsers.length > 0 && selectedUsers.length === displayedUsers.length}
+                        onChange={handleSelectAll}
+                      />
+                    </TableCell>
+                    <TableCell>Аватар</TableCell>
+                    <TableCell>Имя</TableCell>
+                    <TableCell>Фамилия</TableCell>
+                    <TableCell>Username</TableCell>
+                    <TableCell>Телефон</TableCell>
+                    <TableCell>Email</TableCell>
+                    <TableCell>Регистрация</TableCell>
+                    <TableCell>Заказы</TableCell>
+                    <TableCell>Потрачено</TableCell>
+                    <TableCell>Бонусы</TableCell>
+                    <TableCell>Активен</TableCell>
+                    <TableCell>Заблокирован</TableCell>
+                    <TableCell>Действия</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {displayedUsers.map((user) => (
+                    <TableRow key={user.id} hover selected={selectedUsers.includes(user.id)}>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          checked={selectedUsers.includes(user.id)}
+                          onChange={() => handleSelectUser(user.id)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Avatar>
+                          <PersonIcon />
+                        </Avatar>
+                      </TableCell>
+                      <TableCell>{user.first_name}</TableCell>
+                      <TableCell>{user.last_name}</TableCell>
+                      <TableCell>{user.username}</TableCell>
+                      <TableCell>{user.phone}</TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        {user.registration_date ? new Date(user.registration_date).toLocaleDateString() : '-'}
+                      </TableCell>
+                      <TableCell>{user.total_orders || 0}</TableCell>
+                      <TableCell>{user.total_spent ? `${user.total_spent}₽` : '0₽'}</TableCell>
+                      <TableCell>{user.bonus_balance ? `${user.bonus_balance} баллов` : '0 баллов'}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={user.is_active ? 'Да' : 'Нет'}
+                          color={user.is_active ? 'success' : 'default'}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={user.is_blocked ? 'Да' : 'Нет'}
+                          color={user.is_blocked ? 'error' : 'default'}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <IconButton size="small" onClick={() => console.log('Edit', user.id)}>
+                          <EditIcon />
+                        </IconButton>
+                        <IconButton size="small" onClick={() => console.log('Send message', user.id)}>
+                          <SendIcon />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {displayedUsers.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={14} align="center">
+                        Пользователи не найдены
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <TablePagination
+              rowsPerPageOptions={[5, 10, 25]}
+              component="div"
+              count={filteredUsers.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+              labelRowsPerPage="Строк на странице:"
+              labelDisplayedRows={({ from, to, count }) =>
+                `${from}-${to} из ${count !== -1 ? count : `больше чем ${to}`}`
+              }
+            />
+          </>
         )}
       </Paper>
 

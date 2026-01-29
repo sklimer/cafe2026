@@ -1,4 +1,4 @@
-
+import logging
 from rest_framework import viewsets, generics, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -23,7 +23,7 @@ from restaurants.models import Restaurant, RestaurantBranch
 from catalog.models import Category, Product, Tag, ProductOption, OptionValue
 from orders.models import Order, OrderItem, Cart, CartItem, PromoCode, BonusRule, UserBonusTransaction
 from payments.models import Payment
-
+logger = logging.getLogger(__name__)
 
 from .serializers import (
     UserSerializer, UserAddressSerializer, RestaurantSerializer,
@@ -58,6 +58,9 @@ def api_login(request):
                     user = None
 
             # Проверяем пароль и права
+            logger.info(f'check_password(password, user.password) = {check_password(password, user.password)}')
+            logger.info(f'user.password = {user.password}')
+            logger.info(f'password = {password}')
             if user is not None and check_password(password, user.password) and user.is_staff:
                 login(request, user)
                 return JsonResponse({
@@ -96,7 +99,7 @@ def api_logout(request):
 
 # API для проверки аутентификации
 def api_check_auth(request):
-    if request.user.is_authenticated:
+    if request.user.is_authenticated and request.user.is_staff:
         return JsonResponse({
             'authenticated': True,
             'user': {
@@ -108,7 +111,7 @@ def api_check_auth(request):
                 'is_superuser': request.user.is_superuser
             }
         })
-    return JsonResponse({'authenticated': False}, status=401)
+    return JsonResponse({'authenticated': False})
 
 
 # API для получения CSRF токена
