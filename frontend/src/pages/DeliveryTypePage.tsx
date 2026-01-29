@@ -1,12 +1,21 @@
+
 import React, { useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Container } from 'react-bootstrap';
+import { Container, Badge } from 'react-bootstrap';
 import { useCartStore } from '../stores/cartStore';
+import { useDeliveryStore } from '../stores/deliveryStore';
+import { Address } from '../types';
 
 const DeliveryTypePage: React.FC = () => {
   const navigate = useNavigate();
   const { subtotal } = useCartStore();
+  const { userAddresses, selectedAddress, setSelectedAddress, loadDeliveryPreferences } = useDeliveryStore();
+
+  useEffect(() => {
+    // Загружаем сохраненные настройки доставки
+    loadDeliveryPreferences();
+  }, [loadDeliveryPreferences]);
 
   const handleBack = useCallback(() => {
     navigate('/');
@@ -32,11 +41,10 @@ const DeliveryTypePage: React.FC = () => {
     }
   }, [handleBack]);
 
-  const features = [
-    { id: 1, text: 'ПЕПЕРОНИ УЖЕ ЗДЕСЬ' },
-    { id: 2, text: 'ПОДПИШИТЕСЬ НА НАС' },
-    { id: 3, text: 'ОСТАВЬТЕ ОТЗЫВ', rating: '★4.9', maps: 'Яндекс Карты' }
-  ];
+  const handleAddressSelect = (address: Address) => {
+    setSelectedAddress(address);
+    navigate(-1); // возвращаемся на предыдущую страницу
+  };
 
   return (
     <div className="min-vh-100 bg-white">
@@ -52,41 +60,69 @@ const DeliveryTypePage: React.FC = () => {
           <p className="text-muted">Выберите адрес доставки</p>
         </div>
 
-        {/* Список фич */}
+        {/* Список адресов */}
         <div className="mb-5">
-          {features.map(feature => (
-            <div key={feature.id} className="card border-0 shadow-sm mb-3">
-              <div className="card-body">
-                <div className="d-flex justify-content-between align-items-center">
-                  <span className="fw-bold">{feature.text}</span>
-                  <div className="text-end">
-                    {feature.rating && (
-                      <div className="text-warning fw-bold">{feature.rating}</div>
-                    )}
-                    {feature.maps && (
-                      <small className="text-muted">{feature.maps}</small>
+          {userAddresses.length > 0 ? (
+            userAddresses.map((address) => (
+              <div
+                key={address.id}
+                className={`card border mb-3 ${selectedAddress?.id === address.id ? 'border-primary' : ''}`}
+                style={{ cursor: 'pointer' }}
+                onClick={() => handleAddressSelect(address)}
+              >
+                <div className="card-body">
+                  <div className="d-flex justify-content-between align-items-start mb-2">
+                    <h3 className="h6 fw-bold mb-0">{address.alias || 'Адрес'}</h3>
+                    {address.is_default && (
+                      <Badge bg="primary" className="align-self-start">Основной</Badge>
                     )}
                   </div>
+                  <p className="text-dark mb-1">{address.street}, {address.house}</p>
+                  {address.apartment && (
+                    <p className="text-muted mb-0">Квартира: {address.apartment}</p>
+                  )}
+                  {address.comment && (
+                    <p className="text-muted small mb-0">Комментарий: {address.comment}</p>
+                  )}
                 </div>
               </div>
+            ))
+          ) : (
+            <div className="text-center py-5">
+              <p className="text-muted mb-4">У вас пока нет сохраненных адресов</p>
+              <motion.button
+                whileTap={{ scale: 0.98 }}
+                className="btn btn-primary btn-lg py-3 fw-bold"
+                style={{
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '16px'
+                }}
+                onClick={() => navigate('/select-address')}
+              >
+                + Добавить адрес
+              </motion.button>
             </div>
-          ))}
+          )}
         </div>
 
         {/* Кнопка выбора */}
-        <motion.button
-          whileTap={{ scale: 0.98 }}
-          className="btn btn-primary w-100 py-3 fw-bold mb-4"
-          style={{
-            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-            border: 'none',
-            borderRadius: '12px',
-            fontSize: '16px'
-          }}
-          onClick={() => navigate('/select-address')}
-        >
-          ВЫБРАТЬ
-        </motion.button>
+        {userAddresses.length > 0 && (
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            className="btn btn-primary w-100 py-3 fw-bold mb-4"
+            style={{
+              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+              border: 'none',
+              borderRadius: '12px',
+              fontSize: '16px'
+            }}
+            onClick={() => navigate(-1)}
+          >
+            ВЫБРАТЬ
+          </motion.button>
+        )}
 
         {/* Корзина внизу */}
         <div className="text-center mt-5 pt-5">

@@ -68,7 +68,7 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
     set(state => {
       const updatedAddresses = state.userAddresses.map(address => ({
         ...address,
-        isDefault: address.id === addressId
+        is_default: address.id === addressId
       }));
 
       // Find the new default address
@@ -97,7 +97,7 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
       const isFirstAddress = state.userAddresses.length === 0;
       const newAddress = {
         ...address,
-        isDefault: isFirstAddress
+        is_default: isFirstAddress
       };
 
       const updatedAddresses = [...state.userAddresses, newAddress];

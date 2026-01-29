@@ -131,7 +131,7 @@ const OrdersPage: React.FC = () => {
                       </span>
                     </div>
                     {order.type === 'delivery' && order.address && (
-                      <div className="text-sm text-gray-600 mt-1">📍 {order.address.street}, {order.address.building}</div>
+                      <div className="text-sm text-gray-600 mt-1">📍 {order.address.street}, {order.address.house}</div>
                     )}
                     {order.type === 'pickup' && order.branch && (
                       <div className="text-sm text-gray-600 mt-1">🏪 {order.branch.name}</div>

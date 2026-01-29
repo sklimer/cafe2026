@@ -133,19 +133,23 @@ export interface TelegramUser {
 // Типы для адресов
 export interface Address {
   id: string;
-  userId: string;
-  type: 'home' | 'work' | 'other';
-  street: string;
-  building: string;
-  apartment?: string;
-  entrance?: string;
-  floor?: string;
-  comment?: string;
-  label?: string; // 'Дом', 'Работа', или пользовательская метка
-  isDefault: boolean;
-  coordinates?: [number, number]; // [широта, долгота]
-  createdAt: string;
-  updatedAt: string;
+  alias?: string;       // метка адреса (например, "Дом", "Работа")
+  address: string;      // полный адрес
+  city?: string;        // город
+  street: string;       // улица
+  house: string;        // номер дома
+  entrance?: string;    // подъезд
+  floor?: string;       // этаж
+  apartment?: string;   // квартира
+  intercom?: string;    // домофон
+  comment?: string;     // комментарий
+  latitude?: number | null;         // широта
+  longitude?: number | null;        // долгота
+  geolocation_accuracy?: number | null; // точность геолокации
+  is_default?: boolean; // является ли основным адресом
+  is_verified?: boolean; // проверен ли адрес
+  created_at: string;   // дата создания
+  updated_at: string;   // дата обновления
 }
 
 export interface Branch {

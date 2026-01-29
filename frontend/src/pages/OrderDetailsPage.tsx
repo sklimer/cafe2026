@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useOrderStore } from '../stores/orderStore';
@@ -68,15 +69,15 @@ const mockOrder = {
   status: 'on_the_way' as const,
   address: {
     id: 'addr1',
-    userId: 'user1',
-    type: 'home',
+    alias: 'Дом',
+    address: 'ул. Примерная, д. 10',
+    city: 'Москва',
     street: 'ул. Примерная',
-    building: '10',
+    house: '10',
     apartment: '25',
-    label: 'Дом',
-    isDefault: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    is_default: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
   },
   contactName: 'Иван Иванов',
   contactPhone: '+7 (999) 123-45-67',
@@ -111,7 +112,7 @@ const OrderDetailsPage: React.FC = () => {
     <div className="pb-20">
       {/* Шапка */}
       <div className="sticky top-0 z-10 bg-white shadow-sm p-4 flex items-center justify-between">
-        <button 
+        <button
           className="text-gray-500 mr-2"
           onClick={() => navigate(-1)}
         >
@@ -188,7 +189,7 @@ const OrderDetailsPage: React.FC = () => {
                   <span>{item.product.name} ×{item.quantity}</span>
                   <span>{item.price * item.quantity}₽</span>
                 </div>
-                
+
                 {item.selectedOptions.length > 0 && (
                   <div className="text-sm text-gray-600 mt-1 ml-4">
                     {item.selectedOptions.map(opt => {
@@ -208,7 +209,7 @@ const OrderDetailsPage: React.FC = () => {
           <div className="bg-white rounded-xl p-4 mb-4">
             <h3 className="font-medium mb-3">Адрес доставки:</h3>
             <div className="text-sm">
-              <div>{order.address.street}, {order.address.building}{order.address.apartment ? `, кв. ${order.address.apartment}` : ''}</div>
+              <div>{order.address.street}, {order.address.house}{order.address.apartment ? `, кв. ${order.address.apartment}` : ''}</div>
               {order.contactPhone && (
                 <div className="mt-2">Курьер: {order.contactName} {order.contactPhone}</div>
               )}

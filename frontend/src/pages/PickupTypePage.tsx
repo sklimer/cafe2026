@@ -1,12 +1,21 @@
+
 import React, { useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Container } from 'react-bootstrap';
+import { Container, Badge } from 'react-bootstrap';
 import { useCartStore } from '../stores/cartStore';
+import { useDeliveryStore } from '../stores/deliveryStore';
+import { Branch } from '../types';
 
 const PickupTypePage: React.FC = () => {
   const navigate = useNavigate();
   const { subtotal } = useCartStore();
+  const { selectedBranch, setSelectedBranch, loadDeliveryPreferences } = useDeliveryStore();
+
+  useEffect(() => {
+    // Загружаем сохраненные настройки доставки
+    loadDeliveryPreferences();
+  }, [loadDeliveryPreferences]);
 
   const handleBack = useCallback(() => {
     navigate('/');
@@ -32,11 +41,10 @@ const PickupTypePage: React.FC = () => {
     }
   }, [handleBack]);
 
-  const features = [
-    { id: 1, text: 'ПЕПЕРОНИ УЖЕ ЗДЕСЬ', handle: '@CHATFOODRU' },
-    { id: 2, text: 'ПОДПИШИТЕСЬ НА НАС', handle: '@CHATFOODRU' },
-    { id: 3, text: 'ОСТАВЬТЕ ОТЗЫВ', rating: '4.9', maps: 'Яндекс Карты' }
-  ];
+  const handleRestaurantSelect = (branch: Branch) => {
+    setSelectedBranch(branch);
+    navigate(-1); // возвращаемся на предыдущую страницу
+  };
 
   return (
     <div className="min-vh-100 bg-white">
@@ -52,46 +60,56 @@ const PickupTypePage: React.FC = () => {
           <p className="text-muted">Выберите точку продаж</p>
         </div>
 
-        {/* Список фич */}
+        {/* Информация о выбранном ресторане или кнопка выбора */}
         <div className="mb-5">
-          {features.map(feature => (
-            <div key={feature.id} className="card border-0 shadow-sm mb-3">
+          {selectedBranch ? (
+            <div className="card border border-success mb-4">
               <div className="card-body">
-                <div className="d-flex justify-content-between align-items-center">
-                  <div>
-                    <div className="fw-bold">{feature.text}</div>
-                    {feature.handle && (
-                      <small className="text-primary">{feature.handle}</small>
-                    )}
-                  </div>
-                  <div className="text-end">
-                    {feature.rating && (
-                      <div className="text-warning fw-bold">★{feature.rating}</div>
-                    )}
-                    {feature.maps && (
-                      <small className="text-muted">{feature.maps}</small>
-                    )}
-                  </div>
+                <div className="d-flex justify-content-between align-items-start mb-2">
+                  <h3 className="h6 fw-bold mb-0">{selectedBranch.name}</h3>
+                  <Badge bg="success">Выбрано</Badge>
                 </div>
+                <p className="text-dark mb-1">{selectedBranch.address}</p>
+                <p className="text-muted small mb-0">{selectedBranch.phone}</p>
+                <p className="text-muted small mb-0">{selectedBranch.workTime}</p>
               </div>
             </div>
-          ))}
+          ) : (
+            <div className="text-center py-5">
+              <p className="text-muted mb-4">Вы не выбрали ресторан для самовывоза</p>
+              <motion.button
+                whileTap={{ scale: 0.98 }}
+                className="btn btn-primary btn-lg py-3 fw-bold"
+                style={{
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '16px'
+                }}
+                onClick={() => navigate('/select-restaurant')}
+              >
+                Выбрать ресторан
+              </motion.button>
+            </div>
+          )}
         </div>
 
         {/* Кнопка выбора */}
-        <motion.button
-          whileTap={{ scale: 0.98 }}
-          className="btn btn-primary w-100 py-3 fw-bold mb-4"
-          style={{
-            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-            border: 'none',
-            borderRadius: '12px',
-            fontSize: '16px'
-          }}
-          onClick={() => navigate('/select-restaurant')}
-        >
-          ВЫБРАТЬ
-        </motion.button>
+        {selectedBranch && (
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            className="btn btn-primary w-100 py-3 fw-bold mb-4"
+            style={{
+              background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+              border: 'none',
+              borderRadius: '12px',
+              fontSize: '16px'
+            }}
+            onClick={() => navigate(-1)}
+          >
+            ВЫБРАТЬ
+          </motion.button>
+        )}
 
         {/* Корзина внизу */}
         <div className="text-center mt-5 pt-5">
