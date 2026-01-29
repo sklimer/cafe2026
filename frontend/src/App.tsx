@@ -1,12 +1,14 @@
+
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
+import { useEffect } from 'react';
+import { useDeliveryStore } from './stores/deliveryStore';
 
 // Импортируйте новый компонент с ChatBurger дизайном
 import MenuPage from './pages/MenuPage';
 import RestaurantListPage from './pages/RestaurantListPage';
 import ProductPage from './pages/ProductPage';
-import AddressesPage from './pages/AddressesPage';
 import ProfilePage from './pages/ProfilePage';
 import PromotionsPage from './pages/PromotionsPage';
 import CategoryPage from './pages/CategoryPage';
@@ -32,6 +34,13 @@ const queryClient = new QueryClient({
 });
 
 function App() {
+  const { loadDeliveryPreferences } = useDeliveryStore();
+
+  // Load delivery preferences when app starts
+  useEffect(() => {
+    loadDeliveryPreferences();
+  }, [loadDeliveryPreferences]);
+
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
@@ -46,7 +55,6 @@ function App() {
 
             <Route path="/menu/:restaurantId" element={<MenuPage />} />
             <Route path="/product/:productId" element={<ProductPage />} />
-            <Route path="/addresses" element={<AddressesPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/promotions" element={<PromotionsPage />} />
             <Route path="/category/:categoryId" element={<CategoryPage />} />
