@@ -17,6 +17,11 @@ import CartPage from './pages/CartPage';
 import Layout from './components/layout/Layout';
 
 
+import DeliveryTypePage from './pages/DeliveryTypePage';
+import PickupTypePage from './pages/PickupTypePage';
+import AddressSelectionPage from './pages/AddressSelectionPage';
+import RestaurantSelectionPage from './pages/RestaurantSelectionPage';
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -34,6 +39,11 @@ function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<MenuPage />} />
             {/* Используйте ChatBurgerMenu вместо обычного MenuPage */}
+            <Route path="/delivery" element={<DeliveryTypePage />} />
+            <Route path="/pickup" element={<PickupTypePage />} />
+            <Route path="/select-address" element={<AddressSelectionPage />} />
+            <Route path="/select-restaurant" element={<RestaurantSelectionPage />} />
+
             <Route path="/menu/:restaurantId" element={<MenuPage />} />
             <Route path="/product/:productId" element={<ProductPage />} />
             <Route path="/addresses" element={<AddressesPage />} />

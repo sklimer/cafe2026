@@ -262,20 +262,28 @@ const ChatBurgerMenu: React.FC = () => {
           {/* Переключатель доставки */}
           <div className="mb-3">
             <div className="d-inline-flex rounded bg-light p-1">
-              <button
+              <motion.button
+                whileTap={{ scale: 0.95 }}
                 className={`btn btn-sm px-4 py-2 ${orderType === 'delivery' ? 'btn-light shadow-sm text-primary' : 'btn-text'}`}
-                onClick={() => setOrderType('delivery')}
+                onClick={() => {
+                  setOrderType('delivery');
+                  navigate('/delivery');
+                }}
               >
                 <span className="me-1">🚚</span>
                 Доставка
-              </button>
-              <button
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
                 className={`btn btn-sm px-4 py-2 ${orderType === 'pickup' ? 'btn-light shadow-sm text-primary' : 'btn-text'}`}
-                onClick={() => setOrderType('pickup')}
+                onClick={() => {
+                  setOrderType('pickup');
+                  navigate('/pickup');
+                }}
               >
                 <span className="me-1">🏃</span>
                 Самовывоз
-              </button>
+              </motion.button>
             </div>
           </div>
 
