@@ -13,24 +13,25 @@ class Restaurant(models.Model):
     cover_url = models.URLField(blank=True)
     website = models.URLField(blank=True)
 
-    # Contact info
+    # Контактная информация
+    address = models.TextField(blank=True, verbose_name="Адрес")  # ← НОВОЕ ПОЛЕ
     contact_phone = models.CharField(max_length=50, blank=True)
     contact_email = models.EmailField(blank=True)
     support_phone = models.CharField(max_length=50, blank=True)
 
-    # Legal info
+    # Юридическая информация
     legal_name = models.CharField(max_length=255, blank=True)
     inn = models.CharField(max_length=20, blank=True)
     kpp = models.CharField(max_length=20, blank=True)
     ogrn = models.CharField(max_length=20, blank=True)
     legal_address = models.TextField(blank=True)
 
-    # Settings
+    # Настройки
     timezone_name = models.CharField(max_length=50, default='Europe/Moscow')
     currency = models.CharField(max_length=3, default='RUB')
     default_language = models.CharField(max_length=10, default='ru')
 
-    # Status
+    # Статус
     is_active = models.BooleanField(default=True)
     is_featured = models.BooleanField(default=False)
     VERIFICATION_STATUS_CHOICES = [
@@ -38,9 +39,13 @@ class Restaurant(models.Model):
         ('verified', 'Verified'),
         ('rejected', 'Rejected'),
     ]
-    verification_status = models.CharField(max_length=50, choices=VERIFICATION_STATUS_CHOICES, default='pending')
+    verification_status = models.CharField(
+        max_length=50,
+        choices=VERIFICATION_STATUS_CHOICES,
+        default='pending'
+    )
 
-    # Metadata
+    # Метаданные
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
 

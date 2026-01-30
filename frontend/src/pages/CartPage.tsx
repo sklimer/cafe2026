@@ -52,7 +52,7 @@ const CartPage: React.FC = () => {
 
   const handleCheckout = () => {
     if (items.length > 0) {
-      navigate('/checkout');
+      navigate('/orders');
     }
   };
 

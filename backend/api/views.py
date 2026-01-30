@@ -23,6 +23,7 @@ from restaurants.models import Restaurant, RestaurantBranch
 from catalog.models import Category, Product, Tag, ProductOption, OptionValue
 from orders.models import Order, OrderItem, Cart, CartItem, PromoCode, BonusRule, UserBonusTransaction
 from payments.models import Payment
+
 logger = logging.getLogger(__name__)
 
 from .serializers import (
@@ -645,6 +646,36 @@ class UserAddressViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return UserAddress.objects.filter(user=self.request.user)
 
+    def create(self, request, *args, **kwargs):
+        # Добавляем логирование для отладки
+        logger.warning(f"Creating address with data: {request.data}")
+
+        # Проверяем наличие обязательных полей
+        if not request.data.get('address'):
+            # Пытаемся сформировать адрес из других полей, если не передан
+            street = request.data.get('street', '').strip()
+            house = request.data.get('house', '').strip()
+            if street and house:
+                request.data['address'] = f"{street}, {house}"
+            elif street:
+                request.data['address'] = street
+            elif house:
+                request.data['address'] = f"Дом {house}"
+            else:
+                return Response(
+                    {"error": "Поле address обязательно для заполнения"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        try:
+            return super().create(request, *args, **kwargs)
+        except Exception as e:
+            logger.error(f"Error creating address: {str(e)}")
+            return Response(
+                {"error": "Ошибка при создании адреса"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
     @action(detail=False, methods=['post'])
     def geocode(self, request):
         """
@@ -745,18 +776,6 @@ class ClearCartView(APIView):
     def post(self, request):
         # Implementation would go here
         return Response({'status': 'cleared'})
-
-
-class ProfileView(APIView):
-    """
-    Профиль пользователя
-    GET /api/v1/profile/
-    """
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        serializer = UserSerializer(request.user)
-        return Response(serializer.data)
 
 
 class UserOrdersView(APIView):
@@ -1465,3 +1484,235 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response({'status': 'users deactivated'})
 
         return Response({'error': 'Invalid action'}, status=400)
+
+    @action(detail=True, methods=['patch'])
+    def update_delivery_preferences(self, request, pk=None):
+        """
+        Обновление предпочтений доставки пользователя
+        PATCH /api/v1/users/{id}/update_delivery_preferences/
+        """
+        user = self.get_object()
+
+        # Проверяем разрешения - либо пользователь обновляет себя, либо это админ
+        if request.user != user and not request.user.is_staff:
+            return Response(
+                {'error': 'У вас нет прав для обновления этих настроек'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        data = request.data.copy()
+
+        # Валидируем данные
+        delivery_type = data.get('delivery_type')
+        if delivery_type and delivery_type not in ['delivery', 'pickup']:
+            return Response(
+                {'delivery_type': ['Допустимые значения: delivery, pickup']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Обновляем только поля доставки
+        if 'delivery_type' in data:
+            user.delivery_type = data['delivery_type']
+
+        if 'selected_restaurant_for_pickup' in data:
+            restaurant_id = data['selected_restaurant_for_pickup']
+            if restaurant_id:
+                try:
+                    restaurant = Restaurant.objects.get(id=restaurant_id)
+                    user.selected_restaurant_for_pickup = restaurant
+                except Restaurant.DoesNotExist:
+                    return Response(
+                        {'selected_restaurant_for_pickup': ['Ресторан не найден']},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            else:
+                user.selected_restaurant_for_pickup = None
+
+        if 'selected_branch_for_pickup' in data:
+            branch_id = data['selected_branch_for_pickup']
+            if branch_id:
+                try:
+                    branch = RestaurantBranch.objects.get(id=branch_id)
+                    user.selected_branch_for_pickup = branch
+                except RestaurantBranch.DoesNotExist:
+                    return Response(
+                        {'selected_branch_for_pickup': ['Филиал не найден']},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            else:
+                user.selected_branch_for_pickup = None
+
+        try:
+            user.save()
+            serializer = self.get_serializer(user)
+            return Response(serializer.data)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class ProfileView(APIView):
+    """
+    Профиль пользователя
+    GET /api/v1/profile/
+    PATCH /api/v1/profile/ - обновление профиля (включая настройки доставки)
+    PUT /api/v1/profile/ - полное обновление профиля
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+
+    def put(self, request):
+        """
+        Полное обновление профиля пользователя
+        """
+        serializer = UserSerializer(request.user, data=request.data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def patch(self, request):
+        """
+        Частичное обновление профиля пользователя
+        """
+        serializer = UserSerializer(request.user, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            # Проверяем, обновляем ли мы только поля доставки
+            delivery_fields = ['delivery_type', 'selected_restaurant_for_pickup', 'selected_branch_for_pickup']
+            is_delivery_update = any(field in request.data for field in delivery_fields)
+
+            if is_delivery_update:
+                # Используем специальный метод для обновления доставки
+                user = serializer.update_delivery_pickup(request.user, serializer.validated_data)
+
+                # Возвращаем обновленные данные пользователя
+                response_serializer = UserSerializer(user)
+                return Response(response_serializer.data)
+            else:
+                # Стандартное обновление других полей
+                serializer.save()
+                return Response(serializer.data)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class DeliveryPreferencesView(APIView):
+    """
+    API для работы с предпочтениями доставки
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """
+        Получение предпочтений доставки пользователя
+        GET /api/v1/delivery_preferences/
+        """
+        user = request.user
+
+        data = {
+            'delivery_type': user.delivery_type,
+            'pickup_restaurant_info': None
+        }
+
+        if user.delivery_type == 'pickup':
+            if user.selected_branch_for_pickup:
+                data['pickup_restaurant_info'] = {
+                    'branch_id': user.selected_branch_for_pickup.id,
+                    'restaurant_id': user.selected_branch_for_pickup.restaurant.id,
+                    'name': user.selected_branch_for_pickup.name,
+                    'address': user.selected_branch_for_pickup.address,
+                    'type': 'branch'
+                }
+            elif user.selected_restaurant_for_pickup:
+                data['pickup_restaurant_info'] = {
+                    'restaurant_id': user.selected_restaurant_for_pickup.id,
+                    'name': user.selected_restaurant_for_pickup.name,
+                    'address': user.selected_restaurant_for_pickup.address,
+                    'type': 'restaurant'
+                }
+
+        return Response(data)
+
+    def patch(self, request):
+        """
+        Обновление предпочтений доставки
+        PATCH /api/v1/delivery_preferences/
+        """
+        user = request.user
+        data = request.data.copy()
+
+        # Валидация delivery_type
+        delivery_type = data.get('delivery_type')
+        if delivery_type and delivery_type not in ['delivery', 'pickup']:
+            return Response(
+                {'delivery_type': ['Допустимые значения: delivery, pickup']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Обновляем поля доставки
+        if 'delivery_type' in data:
+            user.delivery_type = data['delivery_type']
+
+        if 'selected_restaurant_for_pickup' in data:
+            restaurant_id = data['selected_restaurant_for_pickup']
+            if restaurant_id:
+                try:
+                    restaurant = Restaurant.objects.get(id=restaurant_id)
+                    user.selected_restaurant_for_pickup = restaurant
+                except Restaurant.DoesNotExist:
+                    return Response(
+                        {'selected_restaurant_for_pickup': ['Ресторан не найден']},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            else:
+                user.selected_restaurant_for_pickup = None
+
+        if 'selected_branch_for_pickup' in data:
+            branch_id = data['selected_branch_for_pickup']
+            if branch_id:
+                try:
+                    branch = RestaurantBranch.objects.get(id=branch_id)
+                    user.selected_branch_for_pickup = branch
+                except RestaurantBranch.DoesNotExist:
+                    return Response(
+                        {'selected_branch_for_pickup': ['Филиал не найден']},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            else:
+                user.selected_branch_for_pickup = None
+
+        try:
+            user.save()
+
+            # Возвращаем обновленные предпочтения
+            return Response({
+                'success': True,
+                'delivery_type': user.delivery_type,
+                'pickup_restaurant_info': None if user.delivery_type != 'pickup' else (
+                    {
+                        'branch_id': user.selected_branch_for_pickup.id,
+                        'restaurant_id': user.selected_branch_for_pickup.restaurant.id,
+                        'name': user.selected_branch_for_pickup.name,
+                        'address': user.selected_branch_for_pickup.address,
+                        'type': 'branch'
+                    } if user.selected_branch_for_pickup else
+                    {
+                        'restaurant_id': user.selected_restaurant_for_pickup.id,
+                        'name': user.selected_restaurant_for_pickup.name,
+                        'address': user.selected_restaurant_for_pickup.address,
+                        'type': 'restaurant'
+                    } if user.selected_restaurant_for_pickup else None
+                )
+            })
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )

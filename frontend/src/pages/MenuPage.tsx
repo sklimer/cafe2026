@@ -1,14 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Container, Row, Col } from 'react-bootstrap';
 import { useCartStore } from '../stores/cartStore';
 import { Product, Category } from '../types';
 import { apiClient, getFullImageUrl } from '../api/client';
 import { useQuery } from '@tanstack/react-query';
-import { Container, Row, Col } from 'react-bootstrap';
-
-
-
 
 // Вспомогательная функция для безопасного доступа к тегам
 const getProductTags = (product: any): any[] => {
@@ -56,16 +52,13 @@ const renderBadge = (tag: any, index: number) => {
   };
 
   return (
-    <motion.div
+    <div
       key={index}
-      initial={{ scale: 0.8, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ delay: index * 0.1 }}
       className={`position-absolute top-0 start-0 px-2 py-1 text-xs fw-bold rounded m-2 ${getBadgeStyle(tagName)} shadow-sm`}
       style={{ zIndex: 1 }}
     >
       {getBadgeText(tagName)}
-    </motion.div>
+    </div>
   );
 };
 
@@ -233,7 +226,7 @@ const ChatBurgerMenu: React.FC = () => {
   if (!menuData?.success) {
     return (
       <div className="d-flex flex-column align-items-center justify-content-center vh-100 p-4 bg-light">
-        <div className="display-1 mb-4 animate__animated animate__bounce">🍔</div>
+        <div className="display-1 mb-4">🍔</div>
         <h2 className="h2 mb-2 text-dark">Не удалось загрузить меню</h2>
         <p className="text-muted text-center mb-4">
           {menuData?.error || 'Произошла ошибка при загрузке данных'}
@@ -250,63 +243,67 @@ const ChatBurgerMenu: React.FC = () => {
 
   return (
     <div className="min-vh-100 bg-white pb-5">
-      {/* Основной хедер */}
-      <motion.header
-        ref={headerRef}
-        initial={{ y: 0 }}
-        animate={{ y: showHeader ? 0 : -80 }}
-        transition={{ duration: 0.3 }}
-        className={`sticky-top bg-white border-bottom ${isScrolled ? 'shadow-sm' : ''}`}
-      >
-        <Container className="px-3 pt-3">
-          {/* Переключатель доставки */}
-          <div className="mb-3">
-            <div className="d-inline-flex rounded bg-light p-1">
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                className={`btn btn-sm px-4 py-2 ${orderType === 'delivery' ? 'btn-light shadow-sm text-primary' : 'btn-text'}`}
-                onClick={() => {
-                  setOrderType('delivery');
-                  navigate('/delivery');
-                }}
-              >
-                <span className="me-1">🚚</span>
-                Доставка
-              </motion.button>
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                className={`btn btn-sm px-4 py-2 ${orderType === 'pickup' ? 'btn-light shadow-sm text-primary' : 'btn-text'}`}
-                onClick={() => {
-                  setOrderType('pickup');
-                  navigate('/pickup');
-                }}
-              >
-                <span className="me-1">🏃</span>
-                Самовывоз
-              </motion.button>
-            </div>
-          </div>
+  {/* Блок 1: Header с переключателем доставки */}
+  <header
+    ref={headerRef}
+  >
+    <Container className="px-3 pt-3">
+      {/* Переключатель доставки */}
+      <div className="mb-3">
+        <div className="d-inline-flex rounded bg-light p-1">
+          <button
+            className={`btn btn-sm px-4 py-2 ${orderType === 'delivery' ? 'btn-light shadow-sm text-primary' : 'btn-text'}`}
+            onClick={() => {
+              setOrderType('delivery');
+              navigate('/delivery');
+            }}
+          >
+            <span className="me-1">🚚</span>
+            Доставка
+          </button>
+          <button
+            className={`btn btn-sm px-4 py-2 ${orderType === 'pickup' ? 'btn-light shadow-sm text-primary' : 'btn-text'}`}
+            onClick={() => {
+              setOrderType('pickup');
+              navigate('/pickup');
+            }}
+          >
+            <span className="me-1">🏃</span>
+            Самовывоз
+          </button>
+        </div>
+      </div>
+    </Container>
+  </header>
 
-          {/* Категории продуктов - основной блок */}
-          <div ref={categoriesRef}>
-            <Container className="px-3">
-              <div className="py-2">
-                <div className="d-flex overflow-auto gap-3">
-                  {categories.map(category => (
-                    <button
-                      key={category.id}
-                      className={`btn btn-sm ${activeCategory === category.id.toString() ? 'btn-primary text-white shadow' : 'btn-light'} px-3 py-2 text-nowrap`}
-                      onClick={() => handleCategoryChange(category.id.toString())}
-                    >
-                      {category.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </Container>
-          </div>
-        </Container>
-      </motion.header>
+  {/* Блок 2: Section с меню категорий */}
+{/* Блок 2: Section с меню категорий */}
+<section className="sticky top-0 z-50 bg-white shadow-sm">
+  <div ref={categoriesRef} className="menuWrapper" style={{ overflow: 'hidden' }}>
+    <div className="menuLimiter" style={{
+      paddingBottom: '20px',
+      marginBottom: '-20px',
+      overflowX: 'auto',
+      overflowY: 'hidden',
+      whiteSpace: 'nowrap',
+      WebkitOverflowScrolling: 'touch',
+      msOverflowStyle: 'none',
+      scrollbarWidth: 'none'
+    }}>
+      <div className="d-flex gap-2 py-2 px-3" style={{ display: 'inline-flex', minWidth: 'min-content' }}>
+        {categories.map(category => (
+          <button
+            key={category.id}
+            className={`btn btn-sm ${activeCategory === category.id.toString() ? 'btn-primary text-white shadow' : 'btn-light'} px-3 py-2 text-nowrap flex-shrink-0`}
+            onClick={() => handleCategoryChange(category.id.toString())}
+          >
+            {category.name}
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
 
       {/* Основной контент */}
       <Container className="px-3 pt-4" style={{ paddingBottom: '70px' }}>
@@ -348,10 +345,7 @@ const ChatBurgerMenu: React.FC = () => {
 
                     return (
                       <Col key={product.id} xs={6}>
-                        <motion.div
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.05 }}
+                        <div
                           className="card h-100 border shadow-sm"
                           onClick={(e) => handleAddToCart(product, e)}
                           style={{ cursor: 'pointer' }}
@@ -434,7 +428,7 @@ const ChatBurgerMenu: React.FC = () => {
                               </div>
                             </div>
                           </div>
-                        </motion.div>
+                        </div>
                       </Col>
                     );
                   })}
@@ -445,29 +439,28 @@ const ChatBurgerMenu: React.FC = () => {
         )}
       </Container>
 
-      {/* ФИКСИРОВАННАЯ КНОПКА КОРЗИНЫ - ОБНОВЛЕННЫЙ КОД */}
-
+      {/* ФИКСИРОВАННАЯ КНОПКА КОРЗИНЫ */}
       <div
         className="position-fixed bottom-0 start-0 end-0"
         style={{
-          zIndex: 9999, // Очень высокий z-index
-          height: '70px', // Увеличиваем высоту
-          backgroundColor: 'white', // Белый фон под кнопкой
-          boxShadow: '0 -2px 20px rgba(0, 0, 0, 0.1)' // Тень сверху
+          zIndex: 9999,
+          height: '70px',
+          backgroundColor: 'white',
+          boxShadow: '0 -2px 20px rgba(0, 0, 0, 0.1)'
         }}
       >
         <div className="h-100 w-100 px-3 py-2">
           <button
             className={`btn w-100 h-100 d-flex align-items-center justify-content-center rounded-3 shadow ${totalItems() === 0 ? 'opacity-75' : ''}`}
-          onClick={() => totalItems() > 0 && navigate('/cart')}
-          disabled={totalItems() === 0}
+            onClick={() => totalItems() > 0 && navigate('/cart')}
+            disabled={totalItems() === 0}
             style={{
               background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
               color: 'white',
-              fontSize: '18px', // Увеличиваем шрифт
-              fontWeight: '700', // Делаем жирнее
+              fontSize: '18px',
+              fontWeight: '700',
               border: 'none',
-              minHeight: '56px' // Минимальная высота
+              minHeight: '56px'
             }}
           >
             <span className="d-flex align-items-center gap-2">

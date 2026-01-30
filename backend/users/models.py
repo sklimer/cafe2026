@@ -72,6 +72,38 @@ class User(AbstractBaseUser, PermissionsMixin):
     referred_by = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True)
     referral_count = models.IntegerField(default=0)
 
+    # Delivery preferences - НОВЫЕ ПОЛЯ
+    delivery_type = models.CharField(
+        max_length=20,
+        choices=[
+            ('delivery', 'Доставка'),
+            ('pickup', 'Самовывоз')
+        ],
+        default='pickup',
+        verbose_name='Тип доставки',
+        help_text='Предпочтительный тип доставки пользователя'
+    )
+
+    selected_restaurant_for_pickup = models.ForeignKey(
+        'restaurants.Restaurant',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name='Выбранный ресторан для самовывоза',
+        help_text='Ресторан, выбранный пользователем для самовывоза',
+        related_name='users_pickup'
+    )
+
+    selected_branch_for_pickup = models.ForeignKey(
+        'restaurants.RestaurantBranch',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name='Выбранный филиал для самовывоза',
+        help_text='Конкретный филиал ресторана для самовывоза',
+        related_name='users_pickup'
+    )
+
     # Preferences (JSON for flexibility)
     notification_preferences = models.JSONField(default=dict, blank=True)
     settings = models.JSONField(default=dict, blank=True)
@@ -146,6 +178,29 @@ class User(AbstractBaseUser, PermissionsMixin):
         self.temp_password = password  # Сохраняем незашифрованный (только для показа)
         self.save()
         return password
+
+    @property
+    def pickup_restaurant_info(self):
+        """Возвращает информацию о выбранном ресторане для самовывоза"""
+        if self.delivery_type != 'pickup':
+            return None
+
+        if self.selected_branch_for_pickup:
+            return {
+                'type': 'branch',
+                'branch_id': self.selected_branch_for_pickup.id,
+                'restaurant_id': self.selected_branch_for_pickup.restaurant.id,
+                'name': self.selected_branch_for_pickup.name,
+                'address': self.selected_branch_for_pickup.address
+            }
+        elif self.selected_restaurant_for_pickup:
+            return {
+                'type': 'restaurant',
+                'restaurant_id': self.selected_restaurant_for_pickup.id,
+                'name': self.selected_restaurant_for_pickup.name,
+                'address': self.selected_restaurant_for_pickup.address
+            }
+        return None
 
 
 class UserAddress(models.Model):

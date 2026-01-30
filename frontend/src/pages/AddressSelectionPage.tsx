@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -19,8 +18,6 @@ const AddressSelectionPage: React.FC = () => {
 
   // Состояния формы
   const [formData, setFormData] = useState({
-    alias: '',
-    address: '',
     city: '',
     street: '',
     house: '',
@@ -28,12 +25,7 @@ const AddressSelectionPage: React.FC = () => {
     floor: '',
     apartment: '',
     intercom: '',
-    comment: '',
-    latitude: '',
-    longitude: '',
-    geolocation_accuracy: '',
-    isDefault: false,
-    isVerified: false
+    comment: ''
   });
 
   const handleBack = useCallback(() => {
@@ -44,12 +36,11 @@ const AddressSelectionPage: React.FC = () => {
   useTelegramBackButton(handleBack, true);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
-    const checked = (e.target as HTMLInputElement).checked;
+    const { name, value } = e.target;
 
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: value
     }));
   };
 
@@ -59,12 +50,6 @@ const AddressSelectionPage: React.FC = () => {
     setError(null);
 
     // Проверка обязательных полей
-    if (!formData.alias.trim()) {
-      setError('Пожалуйста, укажите метку адреса');
-      setLoading(false);
-      return;
-    }
-
     if (!formData.street.trim()) {
       setError('Пожалуйста, укажите улицу');
       setLoading(false);
@@ -79,13 +64,12 @@ const AddressSelectionPage: React.FC = () => {
 
     try {
       // Подготовка данных для отправки, используя правильные поля для API
-      const fullAddress = formData.address ||
-        (formData.street && formData.house ?
-          `${formData.street}, ${formData.house}` :
-          (formData.street || formData.house || 'Адрес'));
+      const fullAddress = formData.street && formData.house ?
+        `${formData.street}, ${formData.house}` :
+        (formData.street || formData.house || 'Адрес');
 
       const addressData = {
-        alias: formData.alias.trim(),
+        alias: `${formData.street}, ${formData.house}`, // Генерируем алиас автоматически
         address: fullAddress.trim(),
         city: formData.city?.trim() || '',
         street: formData.street.trim(),
@@ -94,12 +78,7 @@ const AddressSelectionPage: React.FC = () => {
         floor: formData.floor?.trim() || '',
         apartment: formData.apartment?.trim() || '',
         intercom: formData.intercom?.trim() || '',
-        comment: formData.comment?.trim() || '',
-        latitude: formData.latitude ? parseFloat(formData.latitude) : null,
-        longitude: formData.longitude ? parseFloat(formData.longitude) : null,
-        geolocation_accuracy: formData.geolocation_accuracy?.trim() || null,
-        is_default: formData.isDefault,
-        is_verified: formData.isVerified
+        comment: formData.comment?.trim() || ''
       };
 
       // Отправка запроса в API
@@ -115,8 +94,6 @@ const AddressSelectionPage: React.FC = () => {
 
         // Сбрасываем форму
         setFormData({
-          alias: '',
-          address: '',
           city: '',
           street: '',
           house: '',
@@ -124,12 +101,7 @@ const AddressSelectionPage: React.FC = () => {
           floor: '',
           apartment: '',
           intercom: '',
-          comment: '',
-          latitude: '',
-          longitude: '',
-          geolocation_accuracy: '',
-          isDefault: false,
-          isVerified: false
+          comment: ''
         });
       } else {
         setError(response.error || 'Не удалось добавить адрес');
@@ -177,12 +149,11 @@ const AddressSelectionPage: React.FC = () => {
               >
                 <div className="card-body">
                   <div className="d-flex justify-content-between align-items-start mb-2">
-                    <h3 className="h6 fw-bold mb-0">{address.alias || 'Адрес'}</h3>
-                    {address.is_default && (
-                      <span className="badge bg-primary">Основной</span>
-                    )}
+                    <h3 className="h6 fw-bold mb-0">{address.street}, {address.house}</h3>
                   </div>
-                  <p className="text-dark mb-1">{address.street}, {address.house}</p>
+                  {address.city && (
+                    <p className="text-muted mb-1">{address.city}</p>
+                  )}
                   {address.apartment && (
                     <p className="text-muted mb-0">Квартира: {address.apartment}</p>
                   )}
@@ -226,18 +197,6 @@ const AddressSelectionPage: React.FC = () => {
           )}
 
           <Form onSubmit={handleSubmit}>
-            <Form.Group className="mb-3">
-              <Form.Label>Метка *</Form.Label>
-              <Form.Control
-                type="text"
-                name="alias"
-                value={formData.alias}
-                onChange={handleInputChange}
-                required
-                placeholder="Например: Дом, Работа"
-              />
-            </Form.Group>
-
             <Form.Group className="mb-3">
               <Form.Label>Город</Form.Label>
               <Form.Control
@@ -328,46 +287,6 @@ const AddressSelectionPage: React.FC = () => {
                 placeholder="Дополнительная информация для курьера"
               />
             </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label>Широта</Form.Label>
-              <Form.Control
-                type="text"
-                name="latitude"
-                value={formData.latitude}
-                onChange={handleInputChange}
-                placeholder="Широта (необязательно)"
-              />
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label>Долгота</Form.Label>
-              <Form.Control
-                type="text"
-                name="longitude"
-                value={formData.longitude}
-                onChange={handleInputChange}
-                placeholder="Долгота (необязательно)"
-              />
-            </Form.Group>
-
-            <Form.Check
-              type="checkbox"
-              name="isDefault"
-              label="Сделать основным адресом"
-              checked={formData.isDefault}
-              onChange={handleInputChange}
-              className="mb-3"
-            />
-
-            <Form.Check
-              type="checkbox"
-              name="isVerified"
-              label="Адрес проверен"
-              checked={formData.isVerified}
-              onChange={handleInputChange}
-              className="mb-3"
-            />
           </Form>
         </Modal.Body>
         <Modal.Footer>

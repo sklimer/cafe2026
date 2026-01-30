@@ -140,7 +140,7 @@ const RestaurantSelectionPage: React.FC = () => {
             ))
           ) : (
             <div className="text-center py-5">
-              <p className="text-muted">Нет доступных ресторанов</p>
+              <p className="text-muted">Нет доступных ресторанов++</p>
             </div>
           )}
         </div>

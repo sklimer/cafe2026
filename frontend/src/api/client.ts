@@ -314,7 +314,7 @@ class ApiClient {
 
   async updateUser(userData: Partial<any>) {
     return this.request('/profile/', {
-      method: 'PUT',
+      method: 'PATCH',  // ИЗМЕНЕНО С PUT НА PATCH
       body: JSON.stringify(userData),
     });
   }

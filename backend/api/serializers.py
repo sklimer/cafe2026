@@ -7,7 +7,27 @@ from orders.models import Order, OrderItem, Cart, CartItem, PromoCode, BonusRule
 from payments.models import Payment
 from django.conf import settings
 
+
 class UserSerializer(serializers.ModelSerializer):
+    # Добавляем поля для доставки
+    delivery_type = serializers.ChoiceField(
+        choices=[('delivery', 'Доставка'), ('pickup', 'Самовывоз')],
+        default='delivery'
+    )
+    selected_restaurant_for_pickup = serializers.PrimaryKeyRelatedField(
+        queryset=Restaurant.objects.all(),
+        required=False,
+        allow_null=True
+    )
+    selected_branch_for_pickup = serializers.PrimaryKeyRelatedField(
+        queryset=RestaurantBranch.objects.all(),
+        required=False,
+        allow_null=True
+    )
+
+    # Для отображения информации о ресторане (только чтение)
+    pickup_restaurant_info = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
@@ -16,9 +36,71 @@ class UserSerializer(serializers.ModelSerializer):
             'total_orders', 'total_spent', 'bonus_balance', 'bonus_percent_allowed',
             'referral_code', 'referred_by', 'referral_count',
             'notification_preferences', 'settings',
-            'registration_date', 'last_login', 'last_activity', 'created_at', 'updated_at'
+            'registration_date', 'last_login', 'last_activity', 'created_at', 'updated_at',
+            # Добавленные поля
+            'delivery_type', 'selected_restaurant_for_pickup',
+            'selected_branch_for_pickup', 'pickup_restaurant_info'
         ]
-        read_only_fields = ['id', 'telegram_id', 'registration_date', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'telegram_id', 'registration_date',
+                            'created_at', 'updated_at', 'pickup_restaurant_info']
+
+    def get_pickup_restaurant_info(self, obj):
+        """Возвращает информацию о выбранном ресторане для самовывоза"""
+        if obj.delivery_type != 'pickup':
+            return None
+
+        if obj.selected_branch_for_pickup:
+            return {
+                'branch_id': obj.selected_branch_for_pickup.id,
+                'restaurant_id': obj.selected_branch_for_pickup.restaurant.id,
+                'name': obj.selected_branch_for_pickup.name,
+                'address': obj.selected_branch_for_pickup.address,
+                'type': 'branch'
+            }
+        elif obj.selected_restaurant_for_pickup:
+            return {
+                'restaurant_id': obj.selected_restaurant_for_pickup.id,
+                'name': obj.selected_restaurant_for_pickup.name,
+                'address': obj.selected_restaurant_for_pickup.address,
+                'type': 'restaurant'
+            }
+        return None
+
+    def update_delivery_pickup(self, instance, validated_data):
+        """
+        Обновляет только поля, связанные с доставкой/самовывозом
+        """
+        delivery_type = validated_data.get('delivery_type')
+        selected_restaurant = validated_data.get('selected_restaurant_for_pickup')
+        selected_branch = validated_data.get('selected_branch_for_pickup')
+
+        if delivery_type is not None:
+            instance.delivery_type = delivery_type
+
+        if selected_restaurant is not None:
+            instance.selected_restaurant_for_pickup = selected_restaurant
+
+        if selected_branch is not None:
+            instance.selected_branch_for_pickup = selected_branch
+
+        instance.save()
+        return instance
+
+    def update(self, instance, validated_data):
+        """
+        Стандартный update для всех полей
+        """
+        # Вызываем метод обновления доставки если есть соответствующие поля
+        delivery_fields = ['delivery_type', 'selected_restaurant_for_pickup', 'selected_branch_for_pickup']
+        if any(field in validated_data for field in delivery_fields):
+            instance = self.update_delivery_pickup(instance, validated_data)
+
+        # Удаляем поля доставки из validated_data, чтобы не обновлять их дважды
+        for field in delivery_fields:
+            validated_data.pop(field, None)
+
+        # Обновляем остальные поля стандартным способом
+        return super().update(instance, validated_data)
 
 
 class UserAddressSerializer(serializers.ModelSerializer):
@@ -39,13 +121,12 @@ class UserAddressSerializer(serializers.ModelSerializer):
 
 
 class RestaurantSerializer(serializers.ModelSerializer):
-    branches_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Restaurant
         fields = [
-            'id', 'name', 'slug', 'description', 'logo_url',
-            'cover_url', 'contact_phone', 'branches_count'
+            'id', 'name', 'description',
+            'contact_phone', 'address'
         ]
 
     def get_branches_count(self, obj):

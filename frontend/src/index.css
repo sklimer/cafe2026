@@ -379,5 +379,38 @@ body {
   animation: pulse 0.3s ease-in-out;
 }
 
+/* Залипание меню сверху*/
+.sticky {
+    position: sticky;
+    top: 0;
+}
 
+/* Скролл для меню сверху */
+.menuWrapper {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
 
+.menuLimiter {
+  width: 100%;
+  padding-bottom: 20px;
+  margin-bottom: -20px;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Убираем полосу прокрутки */
+.scroll-menu {
+    display: flex;
+    flex-wrap: scroll;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch; /* Для плавного скролла на iOS */
+}
+
+/* Скрытие скроллбара (опционально) */
+.scroll-menu::-webkit-scrollbar {
+    display: none;
+}

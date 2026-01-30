@@ -92,4 +92,7 @@ urlpatterns = [
     path('dashboard/stats/', views.DashboardStatsView.as_view(), name='dashboard-stats'),
     path('dashboard/recent-orders/', views.RecentOrdersView.as_view(), name='dashboard-recent-orders'),
     path('dashboard/popular-products/', views.PopularProductsView.as_view(), name='dashboard-popular-products'),
+
+    # Delivery endpoints
+    path('delivery_preferences/', views.DeliveryPreferencesView.as_view(), name='delivery_preferences'),
 ]
