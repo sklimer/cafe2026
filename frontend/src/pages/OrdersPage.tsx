@@ -7,12 +7,28 @@ import { useDeliveryStore } from '../stores/deliveryStore';
 import { useOrderStore } from '../stores/orderStore';
 import { apiClient } from '../api/client';
 
+// Функция для нормализации телефона (только цифры)
+const normalizePhone = (phone: string): string => {
+  return phone.replace(/\D/g, '');
+};
+
+// Функция для форматирования телефона для отображения
+const formatPhoneForDisplay = (phone: string): string => {
+  const cleaned = normalizePhone(phone);
+
+  if (cleaned.length === 0) return '';
+  if (cleaned.length <= 1) return `+${cleaned}`;
+  if (cleaned.length <= 4) return `+${cleaned.slice(0, 1)} ${cleaned.slice(1)}`;
+  if (cleaned.length <= 7) return `+${cleaned.slice(0, 1)} ${cleaned.slice(1, 4)} ${cleaned.slice(4)}`;
+  if (cleaned.length <= 9) return `+${cleaned.slice(0, 1)} ${cleaned.slice(1, 4)} ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+  return `+${cleaned.slice(0, 1)} ${cleaned.slice(1, 4)} ${cleaned.slice(4, 7)}-${cleaned.slice(7, 9)}-${cleaned.slice(9, 11)}`;
+};
+
 const OrderPage: React.FC = () => {
   const navigate = useNavigate();
   const { items, subtotal, clearCart } = useCartStore();
   const {
     selectedBranch,
-    selectedAddress,
     userAddresses,
     deliveryType,
     setDeliveryType,
@@ -47,7 +63,9 @@ const OrderPage: React.FC = () => {
         if (response.success && response.data) {
           setUserProfile(response.data);
           if (response.data.phone) {
-            setPhone(response.data.phone);
+            // Сохраняем телефон как есть (только цифры)
+            const normalizedPhone = normalizePhone(response.data.phone);
+            setPhone(normalizedPhone);
           }
           // Устанавливаем тип доставки из профиля
           if (response.data.delivery_type) {
@@ -128,6 +146,45 @@ const OrderPage: React.FC = () => {
     }
   };
 
+  // Обработчик изменения телефона
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Сохраняем только цифры
+    const digitsOnly = normalizePhone(value);
+    setPhone(digitsOnly);
+  };
+
+  // Функция для сохранения телефона в профиле пользователя
+  const saveUserPhone = async (phoneNumber: string): Promise<boolean> => {
+    if (!phoneNumber) return true; // Если телефон пустой, пропускаем сохранение
+
+    try {
+      const normalizedPhone = normalizePhone(phoneNumber);
+
+      // Проверяем, изменился ли телефон по сравнению с текущим в профиле
+      if (userProfile && normalizedPhone === normalizePhone(userProfile.phone || '')) {
+        return true; // Телефон не изменился
+      }
+
+      // Обновляем телефон в профиле пользователя
+      const response = await apiClient.updateUser({
+        phone: normalizedPhone
+      });
+
+      if (response.success && response.data) {
+        // Обновляем профиль в состоянии
+        setUserProfile(response.data);
+        return true;
+      } else {
+        console.error('Error updating phone:', response.error);
+        return false;
+      }
+    } catch (err) {
+      console.error('Error saving phone:', err);
+      return false;
+    }
+  };
+
   // Обработчик оформления заказа
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,13 +212,28 @@ const OrderPage: React.FC = () => {
         return;
       }
 
+      // Проверяем наличие телефона
+      if (!phone || phone.trim() === '') {
+        setError('Пожалуйста, укажите номер телефона');
+        setLoading(false);
+        return;
+      }
+
+      // Сохраняем телефон в профиле пользователя
+      const phoneSaved = await saveUserPhone(phone);
+      if (!phoneSaved) {
+        setError('Не удалось сохранить телефон. Пожалуйста, проверьте номер и попробуйте снова.');
+        setLoading(false);
+        return;
+      }
+
       // Подготавливаем данные заказа
       const orderData: any = {
         type: deliveryType,
         payment_method: paymentMethod,
         promo_code: promoCode || undefined,
         bonus_amount: useBonus ? bonusAmount : 0,
-        phone: phone || undefined,
+        phone: phone, // Отправляем нормализованный телефон
         comment: comment || undefined,
         utensils: utensils || undefined,
         items: items.map(item => ({
@@ -197,31 +269,6 @@ const OrderPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Форматирование телефона для отображения
-  const formatPhoneForDisplay = (value: string) => {
-    const cleaned = value.replace(/\D/g, '');
-
-    // Форматируем для отображения
-    if (cleaned.length === 0) return '';
-    if (cleaned.length <= 1) return `+${cleaned}`;
-    if (cleaned.length <= 4) return `+${cleaned.slice(0, 1)} ${cleaned.slice(1)}`;
-    if (cleaned.length <= 7) return `+${cleaned.slice(0, 1)} ${cleaned.slice(1, 4)} ${cleaned.slice(4)}`;
-    if (cleaned.length <= 9) return `+${cleaned.slice(0, 1)} ${cleaned.slice(1, 4)} ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
-    return `+${cleaned.slice(0, 1)} ${cleaned.slice(1, 4)} ${cleaned.slice(4, 7)}-${cleaned.slice(7, 9)}-${cleaned.slice(9, 11)}`;
-  };
-
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    // Сохраняем только цифры в state для отправки на сервер
-    const digitsOnly = value.replace(/\D/g, '');
-    setPhone(digitsOnly);
-  };
-
-  // Функция для получения стандартного формата телефона для валидации
-  const getPhoneForInput = () => {
-    return formatPhoneForDisplay(phone);
   };
 
   // Если загружается профиль, показываем индикатор
@@ -394,13 +441,13 @@ const OrderPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Секция телефона - упрощенная версия */}
+          {/* Секция телефона */}
           <div className="mb-4">
             <h2 className="h6 fw-bold mb-3">ТЕЛЕФОН</h2>
             <Form.Control
               type="tel"
-              placeholder="+7 917 123-46-78"
-              value={getPhoneForInput()}
+              placeholder="+7 917 123-45-67"
+              value={formatPhoneForDisplay(phone)}
               onChange={handlePhoneChange}
               className="form-control-lg"
               style={{ fontSize: '16px' }}
@@ -482,7 +529,8 @@ const OrderPage: React.FC = () => {
             }}
             disabled={loading || orderLoading || items.length === 0 ||
               (deliveryType === 'pickup' && !selectedBranch) ||
-              (deliveryType === 'delivery' && !defaultAddress)}
+              (deliveryType === 'delivery' && !defaultAddress) ||
+              !phone}
           >
             {loading || orderLoading ? (
               <>
